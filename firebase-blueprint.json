@@ -1,0 +1,101 @@
+{
+  "entities": {
+    "User": {
+      "title": "User",
+      "description": "A user of the ICEPAB Nexus",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string" },
+        "email": { "type": "string", "format": "email" },
+        "displayName": { "type": "string" },
+        "photoURL": { "type": "string" },
+        "role": { "type": "string", "enum": ["student", "admin"] },
+        "gpa": { "type": "number" },
+        "aroScore": { "type": "number" },
+        "isVerified": { "type": "boolean" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["uid", "email", "role", "gpa", "aroScore"]
+    },
+    "Broadcast": {
+      "title": "Broadcast",
+      "description": "A live push notification from the admin",
+      "type": "object",
+      "properties": {
+        "message": { "type": "string" },
+        "authorId": { "type": "string" },
+        "timestamp": { "type": "string", "format": "date-time" }
+      },
+      "required": ["message", "authorId", "timestamp"]
+    },
+    "PendingQuestion": {
+      "title": "Pending Question",
+      "description": "A question uploaded by a user pending validation",
+      "type": "object",
+      "properties": {
+        "courseCode": { "type": "string" },
+        "question": { "type": "string" },
+        "options": { "type": "array", "items": { "type": "string" } },
+        "correctAnswer": { "type": "number" },
+        "authorId": { "type": "string" },
+        "votes": { "type": "number" },
+        "status": { "type": "string", "enum": ["pending", "approved", "rejected"] },
+        "timestamp": { "type": "string", "format": "date-time" }
+      },
+      "required": ["courseCode", "question", "options", "correctAnswer", "authorId", "votes", "status"]
+    },
+    "HostedTest": {
+      "title": "Hosted Test",
+      "description": "A CBT test hosted by a verified user",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "title": { "type": "string" },
+        "courseCode": { "type": "string" },
+        "hostId": { "type": "string" },
+        "hostName": { "type": "string" },
+        "questions": { "type": "array" },
+        "createdAt": { "type": "number" },
+        "expiresAt": { "type": "number" },
+        "status": { "type": "string", "enum": ["active", "ended"] }
+      },
+      "required": ["id", "title", "courseCode", "hostId", "hostName", "questions", "createdAt", "expiresAt", "status"]
+    },
+    "TestResult": {
+      "title": "Test Result",
+      "description": "A user's result for a hosted test",
+      "type": "object",
+      "properties": {
+        "testId": { "type": "string" },
+        "userId": { "type": "string" },
+        "userName": { "type": "string" },
+        "score": { "type": "number" },
+        "totalQuestions": { "type": "number" },
+        "timestamp": { "type": "number" }
+      },
+      "required": ["testId", "userId", "userName", "score", "totalQuestions", "timestamp"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": { "$ref": "#/entities/User" },
+      "description": "Stores user profiles"
+    },
+    "/broadcasts/{broadcastId}": {
+      "schema": { "$ref": "#/entities/Broadcast" },
+      "description": "Stores live broadcasts"
+    },
+    "/pending_questions/{questionId}": {
+      "schema": { "$ref": "#/entities/PendingQuestion" },
+      "description": "Stores pending questions for validation"
+    },
+    "/hosted_tests/{testId}": {
+      "schema": { "$ref": "#/entities/HostedTest" },
+      "description": "Stores hosted tests"
+    },
+    "/test_results/{resultId}": {
+      "schema": { "$ref": "#/entities/TestResult" },
+      "description": "Stores results for hosted tests"
+    }
+  }
+}
