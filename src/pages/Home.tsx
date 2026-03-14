@@ -6,12 +6,16 @@ import { motion } from "motion/react";
 import { collection, onSnapshot, query, orderBy, limit } from "firebase/firestore";
 import { handleFirestoreError, OperationType } from "../utils/errorHandling";
 import { db } from "../firebase";
+import FlashcardEngine from "../components/FlashcardEngine";
+import ResourceVault from "../components/ResourceVault";
+import { Helmet } from "react-helmet-async";
 
 export default function Home({ user }: { user: any }) {
   const [portalStatus, setPortalStatus] = useState<{ status: string; message: string }>({ status: "CHECKING...", message: "Pinging OAU Portal..." });
   const [motivation, setMotivation] = useState(getRandomMotivation());
   const [broadcast, setBroadcast] = useState<string | null>(null);
   const [notificationsEnabled, setNotificationsEnabled] = useState(false);
+  const [showGuestWarning, setShowGuestWarning] = useState(true);
 
   useEffect(() => {
     if ('Notification' in window) {
@@ -93,6 +97,27 @@ export default function Home({ user }: { user: any }) {
 
   return (
     <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="space-y-8">
+      <Helmet>
+        <title>Home | ICEPAB Nexus</title>
+        <meta name="description" content="Welcome to ICEPAB Nexus. Access CBT practice, CGPA calculator, and OAU student resources." />
+      </Helmet>
+      {user?.isAnonymous && showGuestWarning && (
+        <div className="bg-orange-500/10 border border-orange-500/30 text-orange-700 dark:text-orange-300 p-4 rounded-xl flex items-start gap-3 shadow-sm relative pr-10">
+          <ShieldCheck className="shrink-0 mt-0.5" />
+          <div>
+            <p className="font-bold text-sm sm:text-base">Guest Mode Active</p>
+            <p className="text-sm mt-1 opacity-90">Progress is not saved to the Leaderboard. <button onClick={() => window.location.href = "/"} className="underline hover:no-underline font-bold">Connect Google Account</button></p>
+          </div>
+          <button 
+            onClick={() => setShowGuestWarning(false)}
+            aria-label="Dismiss warning"
+            className="absolute top-4 right-4 text-orange-500 hover:text-orange-700 dark:hover:text-orange-200"
+          >
+            ✕
+          </button>
+        </div>
+      )}
+
       {/* Broadcast Banner */}
       {broadcast && (
         <div className="bg-blue-600/10 border border-blue-500/30 text-blue-700 dark:text-blue-200 p-4 rounded-xl flex items-center gap-3 shadow-sm">
@@ -171,6 +196,15 @@ export default function Home({ user }: { user: any }) {
           <h3 className="text-lg font-bold mb-2">Leaderboard</h3>
           <p className="text-sm text-[var(--foreground)]/60 font-medium">Rankings by Study Time. Dominate your peers.</p>
         </Link>
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 mt-8">
+        <div className="lg:col-span-1 glass-panel p-6 rounded-3xl">
+          <FlashcardEngine />
+        </div>
+        <div className="lg:col-span-2 glass-panel p-6 rounded-3xl">
+          <ResourceVault />
+        </div>
       </div>
     </motion.div>
   );

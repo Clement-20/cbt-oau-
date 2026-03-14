@@ -4,6 +4,8 @@ import { handleFirestoreError, OperationType } from "../utils/errorHandling";
 import { db } from "../firebase";
 import { ShieldCheck, Upload, FileText, Check, X, Loader2, Share2 } from "lucide-react";
 import { GoogleGenAI, Type } from "@google/genai";
+import { Helmet } from "react-helmet-async";
+import { toast } from "../components/Toast";
 
 export default function Validator({ user }: { user: any }) {
   const [file, setFile] = useState<File | null>(null);
@@ -88,12 +90,12 @@ export default function Validator({ user }: { user: any }) {
         setFile(null);
         setCourseCode("");
         if (fileInputRef.current) fileInputRef.current.value = "";
-        alert(`Successfully extracted ${extractedQuestions.length} questions for validation!`);
+        toast(`Successfully extracted ${extractedQuestions.length} questions for validation!`);
         setIsProcessing(false);
       };
     } catch (error) {
       console.error("Error processing file:", error);
-      alert("Failed to process file. Please try again.");
+      toast("Failed to process file. Please try again.");
       setIsProcessing(false);
     }
   };
@@ -131,7 +133,7 @@ export default function Validator({ user }: { user: any }) {
         
         // Delete from pending
         await updateDoc(qRef, { status: "approved" }); // Or deleteDoc(qRef)
-        alert("Question reached 20 votes and was auto-approved!");
+        toast("Question reached 20 votes and was auto-approved!");
       } catch (error) {
         handleFirestoreError(error, OperationType.WRITE, "courses");
       }
@@ -159,6 +161,10 @@ export default function Validator({ user }: { user: any }) {
 
   return (
     <div className="space-y-8 max-w-6xl mx-auto">
+      <Helmet>
+        <title>Validator | ICEPAB Nexus</title>
+        <meta name="description" content="Upload materials, let AI parse them, and crowdsource verification on the ICEPAB Nexus Validator." />
+      </Helmet>
       <div>
         <h1 className="text-3xl font-bold tracking-tighter flex items-center gap-3">
           <ShieldCheck className="text-emerald-600 dark:text-emerald-500" /> Validator

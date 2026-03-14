@@ -6,9 +6,8 @@ import './index.css';
 
 const updateSW = registerSW({
   onNeedRefresh() {
-    if (confirm('New content available. Reload?')) {
-      updateSW(true);
-    }
+    console.log('New content available. Reloading...');
+    updateSW(true);
   },
   onOfflineReady() {
     console.log('App ready to work offline');

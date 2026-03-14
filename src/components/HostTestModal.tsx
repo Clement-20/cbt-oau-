@@ -15,6 +15,7 @@ export default function HostTestModal({ user, courses, onClose }: HostTestModalP
   const [title, setTitle] = useState("");
   const [selectedCourse, setSelectedCourse] = useState("");
   const [numQuestions, setNumQuestions] = useState(10);
+  const [maxAttempts, setMaxAttempts] = useState(1);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState("");
   const [mode, setMode] = useState<"course" | "pdf">("course");
@@ -129,7 +130,8 @@ export default function HostTestModal({ user, courses, onClose }: HostTestModalP
       questions: questions,
       createdAt: Date.now(),
       expiresAt: Date.now() + 24 * 60 * 60 * 1000, // 24 hours from now
-      status: "active"
+      status: "active",
+      maxAttempts: maxAttempts
     };
 
     await addDoc(collection(db, "hosted_tests"), testData);
@@ -142,6 +144,7 @@ export default function HostTestModal({ user, courses, onClose }: HostTestModalP
       <div className="bg-[var(--background)] border border-[var(--border)] rounded-3xl p-6 md:p-8 max-w-md w-full shadow-2xl relative max-h-[90vh] overflow-y-auto custom-scrollbar">
         <button 
           onClick={onClose}
+          aria-label="Close modal"
           className="absolute top-4 right-4 p-2 hover:bg-black/5 dark:hover:bg-white/5 rounded-full transition-colors"
         >
           <X size={20} />
@@ -241,6 +244,19 @@ export default function HostTestModal({ user, courses, onClose }: HostTestModalP
               </div>
             </>
           )}
+
+          <div>
+            <label className="block text-sm font-medium mb-1">Max Attempts per User</label>
+            <input 
+              type="number" 
+              value={maxAttempts}
+              onChange={(e) => setMaxAttempts(parseInt(e.target.value) || 1)}
+              min={1}
+              max={10}
+              className="w-full p-3 rounded-xl bg-black/5 dark:bg-white/5 border border-[var(--border)] focus:outline-none focus:ring-2 focus:ring-blue-500"
+              required
+            />
+          </div>
 
           <button 
             type="submit" 

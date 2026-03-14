@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import React, { useState, useEffect } from "react";
 import { courses as localCourses, getRandomQuestions, Question, Course } from "../lib/questions";
 import { BookOpen, Play, CheckCircle2, XCircle, Flame, Users, Plus, Activity } from "lucide-react";
 import { doc, updateDoc, increment, collection, getDocs, getDoc, onSnapshot, query, where, addDoc } from "firebase/firestore";
@@ -6,6 +6,8 @@ import { handleFirestoreError, OperationType } from "../utils/errorHandling";
 import { db } from "../firebase";
 import HostTestModal from "../components/HostTestModal";
 import TestMetricsModal from "../components/TestMetricsModal";
+import { Helmet } from "react-helmet-async";
+import { toast } from "../components/Toast";
 
 interface HostedTest {
   id: string;
@@ -17,6 +19,7 @@ interface HostedTest {
   createdAt: number;
   expiresAt: number;
   status: string;
+  maxAttempts?: number;
 }
 
 export default function CBT({ user }: { user: any }) {
@@ -37,6 +40,9 @@ export default function CBT({ user }: { user: any }) {
   const [currentHostedTestId, setCurrentHostedTestId] = useState<string | null>(null);
   const [metricsTestId, setMetricsTestId] = useState<string | null>(null);
   const [metricsTestTitle, setMetricsTestTitle] = useState<string>("");
+  const [searchQuery, setSearchQuery] = useState("");
+  const [searchHostedTestsQuery, setSearchHostedTestsQuery] = useState("");
+  const [questionLimit, setQuestionLimit] = useState<number>(10);
 
   useEffect(() => {
     if (user) {
@@ -74,18 +80,33 @@ export default function CBT({ user }: { user: any }) {
     if (!user) return;
     const fetchFirestoreCourses = async () => {
       try {
-        const querySnapshot = await getDocs(collection(db, "courses"));
-        const firestoreCourses: Course[] = [];
-        
-        querySnapshot.forEach((doc) => {
-          const data = doc.data();
-          firestoreCourses.push({
-            code: doc.id,
-            title: data.title || doc.id,
-            description: data.description || "Community validated course.",
-            questions: data.questions || []
+        const cacheKey = "cbt_courses_cache";
+        const cacheTimeKey = "cbt_courses_cache_time";
+        const cacheExpiry = 1000 * 60 * 60 * 24; // 24 hours
+
+        const cachedData = localStorage.getItem(cacheKey);
+        const cachedTime = localStorage.getItem(cacheTimeKey);
+
+        let firestoreCourses: Course[] = [];
+
+        if (cachedData && cachedTime && Date.now() - parseInt(cachedTime) < cacheExpiry) {
+          firestoreCourses = JSON.parse(cachedData);
+        } else {
+          const querySnapshot = await getDocs(collection(db, "courses"));
+          
+          querySnapshot.forEach((doc) => {
+            const data = doc.data();
+            firestoreCourses.push({
+              code: doc.id,
+              title: data.title || doc.id,
+              description: data.description || "Community validated course.",
+              questions: data.questions || []
+            });
           });
-        });
+
+          localStorage.setItem(cacheKey, JSON.stringify(firestoreCourses));
+          localStorage.setItem(cacheTimeKey, Date.now().toString());
+        }
 
         // Merge local and firestore courses
         const mergedCourses = [...localCourses];
@@ -113,22 +134,37 @@ export default function CBT({ user }: { user: any }) {
     fetchFirestoreCourses();
   }, [user]);
 
-  const startTest = (courseCode: string, hostedTest?: HostedTest) => {
-    setSelectedCourse(courseCode);
-    
+  const startTest = async (courseCode: string, hostedTest?: HostedTest) => {
     if (hostedTest) {
+      if (hostedTest.maxAttempts) {
+        try {
+          const q = query(
+            collection(db, "test_results"),
+            where("testId", "==", hostedTest.id),
+            where("userId", "==", user.uid)
+          );
+          const snapshot = await getDocs(q);
+          if (snapshot.size >= hostedTest.maxAttempts) {
+            toast(`You have reached the maximum number of attempts (${hostedTest.maxAttempts}) for this test.`);
+            return;
+          }
+        } catch (error) {
+          console.error("Error checking test attempts:", error);
+        }
+      }
       setQuestions(hostedTest.questions);
       setCurrentHostedTestId(hostedTest.id);
     } else {
       const course = allCourses.find((c) => c.code === courseCode);
       if (!course) return;
       
-      const count = 10; // 10 questions for demo
+      const count = questionLimit;
       const randomQs = [...course.questions].sort(() => 0.5 - Math.random()).slice(0, count);
       setQuestions(randomQs);
       setCurrentHostedTestId(null);
     }
     
+    setSelectedCourse(courseCode);
     setCurrentQuestionIndex(0);
     setScore(0);
     setIsFinished(false);
@@ -205,6 +241,24 @@ export default function CBT({ user }: { user: any }) {
         }
       }
     }, 1500);
+  };
+
+  const handleDragStart = (e: React.DragEvent, index: number) => {
+    e.dataTransfer.setData("courseIndex", index.toString());
+  };
+
+  const handleDrop = (e: React.DragEvent, targetIndex: number) => {
+    const sourceIndex = parseInt(e.dataTransfer.getData("courseIndex"));
+    if (sourceIndex === targetIndex) return;
+    
+    const newCourses = [...allCourses];
+    const [draggedCourse] = newCourses.splice(sourceIndex, 1);
+    newCourses.splice(targetIndex, 0, draggedCourse);
+    setAllCourses(newCourses);
+  };
+
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
   };
 
   if (!user) {
@@ -293,6 +347,10 @@ export default function CBT({ user }: { user: any }) {
 
   return (
     <div className="space-y-8">
+      <Helmet>
+        <title>CBT Engine | ICEPAB Nexus</title>
+        <meta name="description" content="Practice exams for GST 111, BUS 101, SOC 101, and AMS 103 on the ICEPAB Nexus CBT Engine." />
+      </Helmet>
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <h1 className="text-3xl font-bold tracking-tighter flex items-center gap-3">
@@ -313,11 +371,20 @@ export default function CBT({ user }: { user: any }) {
 
       {hostedTests.length > 0 && (
         <div className="mb-8">
-          <h2 className="text-xl font-bold mb-4 flex items-center gap-2">
-            <Activity className="text-red-500" /> Live Hosted Tests
-          </h2>
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-4">
+            <h2 className="text-xl font-bold flex items-center gap-2">
+              <Activity className="text-red-500" /> Live Hosted Tests
+            </h2>
+            <input 
+              type="text" 
+              placeholder="Search hosted tests..." 
+              value={searchHostedTestsQuery}
+              onChange={(e) => setSearchHostedTestsQuery(e.target.value)}
+              className="w-full md:w-64 p-3 rounded-xl bg-black/5 dark:bg-white/5 border border-[var(--border)] focus:outline-none focus:ring-2 focus:ring-red-500 text-sm"
+            />
+          </div>
           <div className="grid md:grid-cols-2 gap-4">
-            {hostedTests.map((test) => (
+            {hostedTests.filter(test => test.title.toLowerCase().includes(searchHostedTestsQuery.toLowerCase()) || test.courseCode.toLowerCase().includes(searchHostedTestsQuery.toLowerCase())).map((test) => (
               <div key={test.id} className="glass-panel p-5 rounded-2xl border border-red-500/20 relative overflow-hidden group">
                 <div className="absolute top-0 right-0 w-16 h-16 bg-red-500/10 rounded-bl-full -z-10 transition-transform group-hover:scale-110"></div>
                 <div className="flex justify-between items-start mb-2">
@@ -326,6 +393,7 @@ export default function CBT({ user }: { user: any }) {
                 </div>
                 <p className="text-sm text-[var(--foreground)]/60 mb-4">
                   Hosted by <span className="font-semibold text-[var(--foreground)]">{test.hostName}</span> • {test.courseCode} • {test.questions.length} Qs
+                  {test.maxAttempts && ` • Max ${test.maxAttempts} attempts`}
                 </p>
                 <div className="flex gap-2">
                   <button 
@@ -352,9 +420,39 @@ export default function CBT({ user }: { user: any }) {
         </div>
       )}
 
+      <div className="mb-6 flex flex-col md:flex-row gap-4">
+        <input 
+          type="text" 
+          placeholder="Search courses..." 
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+          className="flex-1 p-4 rounded-2xl bg-black/5 dark:bg-white/5 border border-[var(--border)] focus:outline-none focus:ring-2 focus:ring-blue-500 text-lg"
+        />
+        <div className="flex items-center gap-3 bg-black/5 dark:bg-white/5 border border-[var(--border)] rounded-2xl px-4 py-2">
+          <label className="text-sm font-bold text-[var(--foreground)]/70 whitespace-nowrap">Questions:</label>
+          <select 
+            value={questionLimit}
+            onChange={(e) => setQuestionLimit(Number(e.target.value))}
+            className="bg-transparent font-bold focus:outline-none cursor-pointer"
+          >
+            <option value={5}>5</option>
+            <option value={10}>10</option>
+            <option value={20}>20</option>
+            <option value={50}>50</option>
+          </select>
+        </div>
+      </div>
+
       <div className="grid md:grid-cols-2 gap-6">
-        {allCourses.map((course) => (
-          <div key={course.code} className="glass-panel p-8 rounded-3xl flex flex-col justify-between group hover:border-blue-500/30 transition-colors">
+        {allCourses.filter(c => c.code.toLowerCase().includes(searchQuery.toLowerCase()) || c.title.toLowerCase().includes(searchQuery.toLowerCase())).map((course, index) => (
+          <div 
+            key={course.code} 
+            draggable
+            onDragStart={(e) => handleDragStart(e, index)}
+            onDrop={(e) => handleDrop(e, index)}
+            onDragOver={handleDragOver}
+            className="glass-panel p-8 rounded-3xl flex flex-col justify-between group hover:border-blue-500/30 transition-colors cursor-move"
+          >
             <div>
               <div className="flex justify-between items-start mb-4">
                 <h2 className="text-3xl font-bold tracking-tight">{course.code}</h2>

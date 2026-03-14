@@ -1,20 +1,33 @@
 import { BrowserRouter as Router, Routes, Route, Link, useLocation } from "react-router-dom";
 import { ThemeProvider, useTheme } from "./components/theme-provider";
-import Home from "./pages/Home";
-import Admin from "./pages/Admin";
-import CBT from "./pages/CBT";
-import Validator from "./pages/Validator";
-import Leaderboard from "./pages/Leaderboard";
-import GPA from "./pages/GPA";
-import Aro from "./pages/Aro";
-import Profile from "./pages/Profile";
-import { useEffect, useState } from "react";
-import { onAuthStateChanged, signInWithPopup, GoogleAuthProvider, signOut, browserPopupRedirectResolver } from "firebase/auth";
+import { HelmetProvider, Helmet } from "react-helmet-async";
+import { useEffect, useState, Suspense, lazy } from "react";
+import { onAuthStateChanged, signInWithPopup, GoogleAuthProvider, signOut, browserPopupRedirectResolver, signInAnonymously } from "firebase/auth";
 import { auth, db } from "./firebase";
 import { doc, getDoc, setDoc, updateDoc } from "firebase/firestore";
 import { handleFirestoreError, OperationType } from "./utils/errorHandling";
-import { LogIn, LogOut, ShieldAlert, Sun, Moon, Calculator, Share2, Menu, X, User, BadgeCheck, Flame } from "lucide-react";
+import { LogIn, LogOut, ShieldAlert, Sun, Moon, Calculator, Share2, Menu, X, User, BadgeCheck, Flame, Loader2 } from "lucide-react";
 import { clsx } from "clsx";
+import NexusBadge from "./components/NexusBadge";
+import Toast from "./components/Toast";
+
+// Lazy load pages for code splitting (low bandwidth optimization)
+const Home = lazy(() => import("./pages/Home"));
+const Admin = lazy(() => import("./pages/Admin"));
+const CBT = lazy(() => import("./pages/CBT"));
+const Validator = lazy(() => import("./pages/Validator"));
+const Leaderboard = lazy(() => import("./pages/Leaderboard"));
+const GPA = lazy(() => import("./pages/GPA"));
+const Aro = lazy(() => import("./pages/Aro"));
+const Profile = lazy(() => import("./pages/Profile"));
+const Setup = lazy(() => import("./pages/Setup"));
+
+const LoadingFallback = () => (
+  <div className="min-h-[60vh] flex flex-col items-center justify-center text-[var(--foreground)]/60">
+    <Loader2 className="animate-spin mb-4 text-blue-500" size={40} />
+    <p className="font-medium">Loading Nexus...</p>
+  </div>
+);
 
 function MainApp() {
   const [user, setUser] = useState<any>(null);
@@ -34,7 +47,21 @@ function MainApp() {
           const userRef = doc(db, "users", currentUser.uid);
           const userSnap = await getDoc(userRef);
           if (!userSnap.exists()) {
-            const newUserData = {
+            const newUserData = currentUser.isAnonymous ? {
+              uid: currentUser.uid,
+              isGuest: true,
+              faculty: "Guest",
+              displayName: "Guest User",
+              photoURL: "https://api.dicebear.com/7.x/avataaars/svg?seed=Guest",
+              role: "guest",
+              xp: 0,
+              isVerified: false,
+              isShana: false,
+              cbtTimeSpent: 0,
+              highScoreCount: 0,
+              shanaPeriodStart: Date.now(),
+              createdAt: new Date().toISOString()
+            } : {
               uid: currentUser.uid,
               email: currentUser.email,
               displayName: currentUser.displayName,
@@ -50,8 +77,14 @@ function MainApp() {
             };
             await setDoc(userRef, newUserData);
             setDbUser(newUserData);
+            if (!currentUser.isAnonymous) {
+              window.location.href = "/setup";
+            }
           } else {
             let userData = userSnap.data();
+            if (!currentUser.isAnonymous && !userData.matricNumber && window.location.pathname !== "/setup") {
+              window.location.href = "/setup";
+            }
             const now = Date.now();
             const shanaPeriodStart = userData.shanaPeriodStart || now;
             
@@ -106,6 +139,16 @@ function MainApp() {
     }
   };
 
+  const guestLogin = async () => {
+    setLoginError(null);
+    try {
+      await signInAnonymously(auth);
+    } catch (error: any) {
+      console.error("Guest login failed", error);
+      setLoginError(`Guest login failed: ${error.message || String(error)}`);
+    }
+  };
+
   const logout = async () => {
     await signOut(auth);
   };
@@ -124,6 +167,10 @@ function MainApp() {
 
   return (
     <div className="min-h-screen bg-[var(--background)] text-[var(--foreground)] font-sans transition-colors duration-300">
+      <Helmet>
+        <title>ICEPAB Nexus | OAU Digital Hub</title>
+        <meta name="description" content="The ultimate digital hub for OAU students. Access CBT practice, CGPA calculator, Leaderboard, and more." />
+      </Helmet>
       <nav className="border-b border-[var(--border)] p-4 sticky top-0 bg-[var(--background)]/80 backdrop-blur-xl z-50 shadow-sm">
         <div className="max-w-7xl mx-auto flex justify-between items-center">
           <div className="flex items-center gap-8">
@@ -149,6 +196,7 @@ function MainApp() {
             <button 
               onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')} 
               className="p-2 rounded-full hover:bg-black/5 dark:hover:bg-white/10 transition-colors"
+              aria-label="Toggle theme"
             >
               {theme === 'dark' ? <Sun size={18} /> : <Moon size={18} />}
             </button>
@@ -156,19 +204,18 @@ function MainApp() {
             {user ? (
               <div className="flex items-center gap-3">
                 {user.email === "banmekeifeoluwa@gmail.com" && (
-                   <Link to="/admin-icepab" className="hidden sm:flex text-xs bg-red-500/10 text-red-600 dark:text-red-400 px-3 py-1.5 rounded-full items-center gap-1.5 font-bold border border-red-500/20 hover:bg-red-500/20 transition-colors">
+                   <Link to="/icepab-admin" className="hidden sm:flex text-xs bg-red-500/10 text-red-600 dark:text-red-400 px-3 py-1.5 rounded-full items-center gap-1.5 font-bold border border-red-500/20 hover:bg-red-500/20 transition-colors">
                      <ShieldAlert size={14} /> Admin
                    </Link>
                 )}
                 <Link to="/profile" className="hidden sm:flex items-center gap-2 hover:bg-black/5 dark:hover:bg-white/10 p-1 pr-3 rounded-full transition-colors border border-transparent hover:border-[var(--border)]">
-                  <img src={user.photoURL} alt="Avatar" className="w-8 h-8 rounded-full border border-[var(--border)]" />
+                  <img src={user.photoURL} alt="Avatar" loading="lazy" decoding="async" className="w-8 h-8 rounded-full border border-[var(--border)]" />
                   <span className="text-sm font-bold truncate max-w-[100px] flex items-center gap-1">
                     {dbUser?.displayName || user.displayName}
-                    {dbUser?.isVerified && <BadgeCheck size={14} className="text-blue-500 shrink-0" />}
-                    {dbUser?.isShana && <Flame size={14} className="text-orange-500 shrink-0" />}
+                    <NexusBadge isVerified={dbUser?.isVerified} badgeType={dbUser?.badgeType} isShana={dbUser?.isShana} />
                   </span>
                 </Link>
-                <button onClick={logout} className="p-2 rounded-full hover:bg-black/5 dark:hover:bg-white/10 transition-colors text-red-500">
+                <button onClick={logout} className="p-2 rounded-full hover:bg-black/5 dark:hover:bg-white/10 transition-colors text-red-500" aria-label="Log out">
                   <LogOut size={18} />
                 </button>
               </div>
@@ -178,7 +225,7 @@ function MainApp() {
               </button>
             )}
 
-            <button className="md:hidden p-2" onClick={() => setMobileMenuOpen(!mobileMenuOpen)}>
+            <button className="md:hidden p-2" onClick={() => setMobileMenuOpen(!mobileMenuOpen)} aria-label="Toggle menu">
               {mobileMenuOpen ? <X size={20} /> : <Menu size={20} />}
             </button>
           </div>
@@ -191,12 +238,11 @@ function MainApp() {
           <div className="flex flex-col gap-4 text-lg font-medium">
             {user && (
               <Link to="/profile" onClick={() => setMobileMenuOpen(false)} className="p-3 rounded-xl hover:bg-black/5 dark:hover:bg-white/5 flex items-center gap-3 border border-[var(--border)] bg-black/5 dark:bg-white/5">
-                <img src={user.photoURL} alt="Avatar" className="w-10 h-10 rounded-full" />
+                <img src={user.photoURL} alt="Avatar" loading="lazy" decoding="async" className="w-10 h-10 rounded-full" />
                 <div className="flex flex-col">
                   <span className="font-bold flex items-center gap-1">
                     {dbUser?.displayName || user.displayName}
-                    {dbUser?.isVerified && <BadgeCheck size={16} className="text-blue-500" />}
-                    {dbUser?.isShana && <Flame size={16} className="text-orange-500" />}
+                    <NexusBadge isVerified={dbUser?.isVerified} badgeType={dbUser?.badgeType} isShana={dbUser?.isShana} />
                   </span>
                   <span className="text-xs text-[var(--foreground)]/50">View Profile & Verify</span>
                 </div>
@@ -213,7 +259,7 @@ function MainApp() {
               </Link>
             ))}
             {user?.email === "banmekeifeoluwa@gmail.com" && (
-              <Link to="/admin-icepab" onClick={() => setMobileMenuOpen(false)} className="p-3 rounded-xl text-red-500 flex items-center gap-3 bg-red-500/10">
+              <Link to="/icepab-admin" onClick={() => setMobileMenuOpen(false)} className="p-3 rounded-xl text-red-500 flex items-center gap-3 bg-red-500/10">
                 <ShieldAlert size={18} /> Admin Dashboard
               </Link>
             )}
@@ -236,27 +282,33 @@ function MainApp() {
             </div>
           </div>
         )}
-        <Routes>
-          <Route path="/" element={<Home user={user} />} />
-          <Route path="/admin-icepab" element={<Admin user={user} />} />
-          <Route path="/cbt" element={<CBT user={user} />} />
-          <Route path="/validate" element={<Validator user={user} />} />
-          <Route path="/leaderboard" element={<Leaderboard user={user} />} />
-          <Route path="/gpa" element={<GPA user={user} />} />
-          <Route path="/aro" element={<Aro user={user} />} />
-          <Route path="/profile" element={<Profile user={user} />} />
-        </Routes>
+        <Suspense fallback={<LoadingFallback />}>
+          <Routes>
+            <Route path="/" element={<Home user={user} />} />
+            <Route path="/icepab-admin" element={<Admin user={user} />} />
+            <Route path="/cbt" element={<CBT user={user} />} />
+            <Route path="/validate" element={<Validator user={user} />} />
+            <Route path="/leaderboard" element={<Leaderboard user={user} />} />
+            <Route path="/gpa" element={<GPA user={user} />} />
+            <Route path="/aro" element={<Aro user={user} />} />
+            <Route path="/profile" element={<Profile user={user} />} />
+            <Route path="/setup" element={<Setup user={user} dbUser={dbUser} setDbUser={setDbUser} />} />
+          </Routes>
+        </Suspense>
       </main>
+      <Toast />
     </div>
   );
 }
 
 export default function App() {
   return (
-    <ThemeProvider defaultTheme="dark" storageKey="vite-ui-theme">
-      <Router>
-        <MainApp />
-      </Router>
-    </ThemeProvider>
+    <HelmetProvider>
+      <ThemeProvider defaultTheme="dark" storageKey="vite-ui-theme">
+        <Router>
+          <MainApp />
+        </Router>
+      </ThemeProvider>
+    </HelmetProvider>
   );
 }

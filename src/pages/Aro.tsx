@@ -1,6 +1,8 @@
 import React, { useState, useRef } from "react";
 import { Share2, Sparkles, MessageCircle, Download, Quote } from "lucide-react";
 import html2canvas from "html2canvas";
+import { Helmet } from "react-helmet-async";
+import { toast } from "../components/Toast";
 
 const aroTemplates = [
   "Just smashed my CBT on ICEPAB Nexus. 100% accuracy. You're still sleeping? ❄️🧊",
@@ -47,9 +49,10 @@ export default function Aro({ user }: { user: any }) {
       link.href = dataUrl;
       link.download = `icepab-aro-${Date.now()}.png`;
       link.click();
+      toast("Image generated successfully!");
     } catch (error) {
       console.error("Failed to download image", error);
-      alert("Failed to generate image.");
+      toast("Failed to generate image.");
     } finally {
       setDownloading(false);
     }
@@ -61,6 +64,10 @@ export default function Aro({ user }: { user: any }) {
 
   return (
     <div className="max-w-4xl mx-auto space-y-8">
+      <Helmet>
+        <title>Aro Generator | ICEPAB Nexus</title>
+        <meta name="description" content="Generate premium shareable hype for your WhatsApp status with the ICEPAB Nexus Aro Generator." />
+      </Helmet>
       <div>
         <h1 className="text-3xl font-bold tracking-tighter flex items-center gap-3">
           <Sparkles className="text-purple-500" /> Aro Generator

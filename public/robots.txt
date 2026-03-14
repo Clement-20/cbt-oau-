@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://icepab-nexus.web.app/sitemap.xml

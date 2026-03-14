@@ -3,6 +3,7 @@ import { collection, query, where, getDocs, doc, updateDoc } from "firebase/fire
 import { handleFirestoreError, OperationType } from "../utils/errorHandling";
 import { db } from "../firebase";
 import { X, Trophy, Clock, Trash2, AlertTriangle } from "lucide-react";
+import { toast } from "./Toast";
 
 interface TestResult {
   id: string;
@@ -64,7 +65,7 @@ export default function TestMetricsModal({ testId, testTitle, onClose }: TestMet
       onClose();
     } catch (error) {
       console.error("Error stopping test:", error);
-      alert("Failed to stop test.");
+      toast("Failed to stop test.");
       setIsStopping(false);
       setShowConfirmStop(false);
     }
@@ -75,6 +76,7 @@ export default function TestMetricsModal({ testId, testTitle, onClose }: TestMet
       <div className="bg-[var(--background)] border border-[var(--border)] rounded-3xl p-6 md:p-8 max-w-2xl w-full shadow-2xl relative max-h-[90vh] flex flex-col">
         <button 
           onClick={onClose}
+          aria-label="Close modal"
           className="absolute top-4 right-4 p-2 hover:bg-black/5 dark:hover:bg-white/5 rounded-full transition-colors"
         >
           <X size={20} />
@@ -98,7 +100,25 @@ export default function TestMetricsModal({ testId, testTitle, onClose }: TestMet
               <p>No one has taken this test yet.</p>
             </div>
           ) : (
-            results.map((result, index) => (
+            Object.values(
+              results.reduce((acc, result) => {
+                if (!acc[result.userId]) {
+                  acc[result.userId] = {
+                    ...result,
+                    attempts: 1,
+                    bestScore: result.score
+                  };
+                } else {
+                  acc[result.userId].attempts += 1;
+                  if (result.score > acc[result.userId].bestScore) {
+                    acc[result.userId].bestScore = result.score;
+                  }
+                }
+                return acc;
+              }, {} as Record<string, TestResult & { attempts: number; bestScore: number }>)
+            )
+            .sort((a, b) => b.bestScore - a.bestScore)
+            .map((result, index) => (
               <div key={result.id} className="flex items-center justify-between p-4 rounded-2xl bg-black/5 dark:bg-white/5 border border-[var(--border)]">
                 <div className="flex items-center gap-4">
                   <div className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-sm ${
@@ -112,14 +132,14 @@ export default function TestMetricsModal({ testId, testTitle, onClose }: TestMet
                   <div>
                     <p className="font-bold">{result.userName}</p>
                     <p className="text-xs text-[var(--foreground)]/50">
-                      {new Date(result.timestamp).toLocaleString()}
+                      Attempts: {result.attempts}
                     </p>
                   </div>
                 </div>
                 <div className="text-right">
-                  <p className="font-bold text-lg">{result.score} / {result.totalQuestions}</p>
+                  <p className="font-bold text-lg">{result.bestScore} / {result.totalQuestions}</p>
                   <p className="text-xs text-[var(--foreground)]/50">
-                    {Math.round((result.score / result.totalQuestions) * 100)}%
+                    {Math.round((result.bestScore / result.totalQuestions) * 100)}%
                   </p>
                 </div>
               </div>

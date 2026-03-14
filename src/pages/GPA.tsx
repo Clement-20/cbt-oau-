@@ -3,6 +3,8 @@ import { doc, getDoc, setDoc } from "firebase/firestore";
 import { handleFirestoreError, OperationType } from "../utils/errorHandling";
 import { db } from "../firebase";
 import { Calculator, Plus, Trash2, Save, Loader2 } from "lucide-react";
+import { Helmet } from "react-helmet-async";
+import { toast } from "../components/Toast";
 
 export default function GPA({ user }: { user: any }) {
   const [courses, setCourses] = useState([{ code: "", units: 3, grade: "A" }]);
@@ -58,10 +60,10 @@ export default function GPA({ user }: { user: any }) {
       const docRef = doc(db, "users", user.uid, "private", "academic");
       await setDoc(docRef, { courses, updatedAt: new Date().toISOString() }, { merge: true });
       calculateGPA();
-      alert("CGPA data saved securely.");
+      toast("CGPA data saved securely.");
     } catch (error) {
       console.error("Error saving GPA:", error);
-      alert("Failed to save data.");
+      toast("Failed to save data.");
     } finally {
       setSaving(false);
     }
@@ -94,6 +96,10 @@ export default function GPA({ user }: { user: any }) {
 
   return (
     <div className="max-w-2xl mx-auto space-y-8">
+      <Helmet>
+        <title>CGPA Calculator | ICEPAB Nexus</title>
+        <meta name="description" content="Calculate and track your OAU CGPA privately on the ICEPAB Nexus." />
+      </Helmet>
       <div>
         <h1 className="text-3xl font-bold tracking-tighter flex items-center gap-3">
           <Calculator className="text-blue-500" /> CGPA Calculator

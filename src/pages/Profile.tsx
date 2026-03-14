@@ -3,6 +3,8 @@ import { doc, getDoc, updateDoc } from "firebase/firestore";
 import { handleFirestoreError, OperationType } from "../utils/errorHandling";
 import { db } from "../firebase";
 import { User, BadgeCheck, Upload, CreditCard, CheckCircle2, Loader2, Save, Flame, Clock, Target } from "lucide-react";
+import { Helmet } from "react-helmet-async";
+import { toast } from "../components/Toast";
 
 export default function Profile({ user }: { user: any }) {
   const [displayName, setDisplayName] = useState("");
@@ -47,10 +49,10 @@ export default function Profile({ user }: { user: any }) {
     try {
       const docRef = doc(db, "users", user.uid);
       await updateDoc(docRef, { displayName });
-      alert("Profile updated successfully!");
+      toast("Profile updated successfully!");
     } catch (error) {
       console.error("Error updating profile:", error);
-      alert("Failed to update profile.");
+      toast("Failed to update profile.");
     } finally {
       setSaving(false);
     }
@@ -65,7 +67,7 @@ export default function Profile({ user }: { user: any }) {
   };
 
   const proceedToPayment = () => {
-    if (!file) return alert("Please upload your Student ID or Portal Biodata first.");
+    if (!file) return toast("Please upload your Student ID or Portal Biodata first.");
     setVerifyStep("paying");
   };
 
@@ -80,7 +82,7 @@ export default function Profile({ user }: { user: any }) {
         setFile(null); // "Delete" the file after verification
       } catch (error) {
         console.error("Verification failed:", error);
-        alert("Payment succeeded but verification failed. Please contact admin.");
+        toast("Payment succeeded but verification failed. Please contact admin.");
         setVerifyStep("idle");
       }
     }, 2000);
@@ -96,6 +98,10 @@ export default function Profile({ user }: { user: any }) {
 
   return (
     <div className="max-w-2xl mx-auto space-y-8">
+      <Helmet>
+        <title>Profile | ICEPAB Nexus</title>
+        <meta name="description" content="Manage your ICEPAB Nexus profile and verification status." />
+      </Helmet>
       <div>
         <h1 className="text-3xl font-bold tracking-tighter flex items-center gap-3">
           <User className="text-blue-500" /> User Profile

@@ -1,8 +1,10 @@
-import React, { useState } from "react";
-import { collection, addDoc, serverTimestamp, query, where, getDocs, updateDoc, doc } from "firebase/firestore";
+import React, { useState, useEffect } from "react";
+import { collection, addDoc, serverTimestamp, query, where, getDocs, updateDoc, doc, increment } from "firebase/firestore";
 import { handleFirestoreError, OperationType } from "../utils/errorHandling";
 import { db } from "../firebase";
-import { ShieldAlert, Send, Search, BadgeCheck, Loader2 } from "lucide-react";
+import { ShieldAlert, Send, Search, BadgeCheck, Loader2, CheckCircle } from "lucide-react";
+import { Helmet } from "react-helmet-async";
+import { toast } from "../components/Toast";
 
 export default function Admin({ user }: { user: any }) {
   const [message, setMessage] = useState("");
@@ -11,6 +13,44 @@ export default function Admin({ user }: { user: any }) {
   const [searchEmail, setSearchEmail] = useState("");
   const [searchResult, setSearchResult] = useState<any>(null);
   const [searchLoading, setSearchLoading] = useState(false);
+
+  const [unverifiedUsers, setUnverifiedUsers] = useState<any[]>([]);
+  const [queueLoading, setQueueLoading] = useState(true);
+
+  useEffect(() => {
+    if (!user || user.email !== "banmekeifeoluwa@gmail.com") return;
+
+    const fetchQueue = async () => {
+      try {
+        const q = query(collection(db, "users"), where("isVerified", "==", false));
+        const snapshot = await getDocs(q);
+        const users: any[] = [];
+        snapshot.forEach((doc) => {
+          users.push({ id: doc.id, ...doc.data() });
+        });
+        setUnverifiedUsers(users);
+      } catch (error) {
+        handleFirestoreError(error, OperationType.GET, "users");
+      } finally {
+        setQueueLoading(false);
+      }
+    };
+
+    fetchQueue();
+  }, [user]);
+
+  const approveUser = async (userId: string) => {
+    try {
+      const userRef = doc(db, "users", userId);
+      await updateDoc(userRef, {
+        isVerified: true,
+        xp: increment(500)
+      });
+      setUnverifiedUsers(prev => prev.filter(u => u.id !== userId));
+    } catch (error) {
+      handleFirestoreError(error, OperationType.UPDATE, `users/${userId}`);
+    }
+  };
 
   if (!user || user.email !== "banmekeifeoluwa@gmail.com") {
     return (
@@ -34,10 +74,10 @@ export default function Admin({ user }: { user: any }) {
         timestamp: serverTimestamp()
       });
       setMessage("");
-      alert("Broadcast sent to all students instantly!");
+      toast("Broadcast sent to all students instantly!");
     } catch (error) {
       console.error("Error sending broadcast:", error);
-      alert("Failed to send broadcast.");
+      toast("Failed to send broadcast.");
     } finally {
       setLoading(false);
     }
@@ -57,7 +97,7 @@ export default function Admin({ user }: { user: any }) {
         const userDoc = querySnapshot.docs[0];
         setSearchResult({ id: userDoc.id, ...userDoc.data() });
       } else {
-        alert("User not found.");
+        toast("User not found.");
       }
     } catch (error) {
       handleFirestoreError(error, OperationType.GET, "users");
@@ -73,15 +113,19 @@ export default function Admin({ user }: { user: any }) {
       const userRef = doc(db, "users", searchResult.id);
       await updateDoc(userRef, { isVerified: true });
       setSearchResult({ ...searchResult, isVerified: true });
-      alert("User verified successfully!");
+      toast("User verified successfully!");
     } catch (error) {
       console.error("Error verifying user:", error);
-      alert("Failed to verify user.");
+      toast("Failed to verify user.");
     }
   };
 
   return (
     <div className="max-w-2xl mx-auto space-y-8">
+      <Helmet>
+        <title>Admin | ICEPAB Nexus</title>
+        <meta name="robots" content="noindex, nofollow" />
+      </Helmet>
       <div>
         <h1 className="text-3xl font-bold tracking-tighter flex items-center gap-3">
           <ShieldAlert className="text-red-600 dark:text-red-500" /> Admin Overlord
@@ -114,6 +158,60 @@ export default function Admin({ user }: { user: any }) {
       </div>
 
       <div className="glass-panel p-8 rounded-3xl shadow-sm space-y-6">
+        <h2 className="text-2xl font-bold mb-2">Verification Queue</h2>
+        <p className="text-sm text-[var(--foreground)]/60 mb-6 font-medium">
+          Approve pending student verifications. Grants +500 XP.
+        </p>
+
+        {queueLoading ? (
+          <div className="p-10 text-center text-[var(--foreground)]/50 font-medium">Loading queue...</div>
+        ) : unverifiedUsers.length === 0 ? (
+          <div className="p-10 text-center text-[var(--foreground)]/50 font-medium flex flex-col items-center justify-center">
+            <CheckCircle className="text-emerald-500 mb-2" size={32} />
+            All caught up! No pending verifications.
+          </div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-left border-collapse">
+              <thead>
+                <tr className="bg-black/5 dark:bg-white/5 text-xs font-bold text-[var(--foreground)]/50 uppercase tracking-widest border-b border-[var(--border)]">
+                  <th className="p-4">Student</th>
+                  <th className="p-4">Matric Number</th>
+                  <th className="p-4">Faculty / Dept</th>
+                  <th className="p-4 text-right">Action</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-[var(--border)]">
+                {unverifiedUsers.map((u) => (
+                  <tr key={u.id} className="hover:bg-black/5 dark:hover:bg-white/5 transition-colors">
+                    <td className="p-4">
+                      <div className="flex items-center gap-3">
+                        <img src={u.photoURL || `https://api.dicebear.com/7.x/avataaars/svg?seed=${u.uid}`} alt={u.displayName} loading="lazy" decoding="async" className="w-10 h-10 rounded-full border border-[var(--border)]" />
+                        <span className="font-bold">{u.displayName}</span>
+                      </div>
+                    </td>
+                    <td className="p-4 font-mono text-sm">{u.matricNumber}</td>
+                    <td className="p-4">
+                      <div className="text-sm font-medium">{u.faculty}</div>
+                      <div className="text-xs text-[var(--foreground)]/50">{u.department}</div>
+                    </td>
+                    <td className="p-4 text-right">
+                      <button 
+                        onClick={() => approveUser(u.id)}
+                        className="bg-emerald-600 hover:bg-emerald-500 text-white px-4 py-2 rounded-lg text-sm font-bold transition-colors shadow-sm inline-flex items-center gap-2"
+                      >
+                        <CheckCircle size={16} /> Approve
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+
+      <div className="glass-panel p-8 rounded-3xl shadow-sm space-y-6">
         <h2 className="text-2xl font-bold mb-2">User Management</h2>
         <p className="text-sm text-[var(--foreground)]/60 mb-6 font-medium">
           Search for users to manually verify them (free of charge).
@@ -140,7 +238,7 @@ export default function Admin({ user }: { user: any }) {
         {searchResult && (
           <div className="mt-6 p-6 bg-black/5 dark:bg-white/5 border border-[var(--border)] rounded-2xl flex items-center justify-between">
             <div className="flex items-center gap-4">
-              <img src={searchResult.photoURL || `https://ui-avatars.com/api/?name=${searchResult.displayName}`} alt="Avatar" className="w-12 h-12 rounded-full" />
+              <img src={searchResult.photoURL || `https://ui-avatars.com/api/?name=${searchResult.displayName}`} alt="Avatar" loading="lazy" decoding="async" className="w-12 h-12 rounded-full" />
               <div>
                 <div className="font-bold flex items-center gap-1">
                   {searchResult.displayName}
