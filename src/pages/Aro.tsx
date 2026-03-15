@@ -120,25 +120,29 @@ export default function Aro({ user }: { user: any }) {
           {/* The Beautiful Card to Download */}
           <div 
             ref={cardRef}
-            className="relative aspect-[9/16] w-full max-w-[350px] rounded-[2rem] overflow-hidden shadow-2xl flex flex-col justify-center p-8 text-center"
+            className="relative aspect-[9/16] w-full max-w-[350px] rounded-[2rem] overflow-hidden shadow-2xl flex flex-col justify-center p-8 text-center border-4 border-purple-500/30"
             style={{
-              background: "linear-gradient(135deg, #4f46e5 0%, #9333ea 100%)",
+              background: "linear-gradient(135deg, #020617 0%, #1e1b4b 100%)",
             }}
           >
+            {/* Neon Glow Elements */}
+            <div className="absolute -top-24 -left-24 w-64 h-64 bg-purple-600/20 rounded-full blur-[80px]"></div>
+            <div className="absolute -bottom-24 -right-24 w-64 h-64 bg-blue-600/20 rounded-full blur-[80px]"></div>
+
             {/* Glassmorphism overlay inside the card */}
-            <div className="absolute inset-4 bg-white/10 backdrop-blur-md border border-white/20 rounded-2xl flex flex-col justify-center p-6 shadow-inner">
-              <Quote className="text-white/40 w-12 h-12 mx-auto mb-4" />
-              <p className="text-white text-xl md:text-2xl font-bold leading-snug drop-shadow-md" style={{ fontFamily: "'Inter', sans-serif" }}>
+            <div className="absolute inset-4 bg-black/40 backdrop-blur-xl border border-white/10 rounded-2xl flex flex-col justify-center p-6 shadow-[0_0_20px_rgba(147,51,234,0.1)]">
+              <Quote className="text-purple-500/40 w-12 h-12 mx-auto mb-4" />
+              <p className="text-white text-xl md:text-2xl font-bold leading-snug drop-shadow-[0_0_10px_rgba(255,255,255,0.3)]" style={{ fontFamily: "'Inter', sans-serif" }}>
                 "{currentAro}"
               </p>
               
               <div className="absolute bottom-6 left-0 w-full flex flex-col items-center">
-                <div className="w-10 h-1 bg-white/30 rounded-full mb-4"></div>
-                <p className="text-white/80 text-xs font-bold tracking-widest uppercase">
+                <div className="w-10 h-1 bg-purple-500/50 rounded-full mb-4 shadow-[0_0_10px_rgba(168,85,247,0.5)]"></div>
+                <p className="text-purple-400/80 text-xs font-bold tracking-[0.2em] uppercase">
                   ICEPAB Nexus
                 </p>
                 {user && (
-                  <p className="text-white/60 text-[10px] mt-1 font-medium">
+                  <p className="text-white/40 text-[10px] mt-1 font-medium">
                     By {user.displayName || "Student"}
                   </p>
                 )}

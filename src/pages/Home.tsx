@@ -143,13 +143,19 @@ export default function Home({ user }: { user: any }) {
             <div className="flex items-center gap-2 text-sm font-bold text-[var(--foreground)]/50 uppercase tracking-wider">
               <Activity size={16} /> Live Portal Pulse
             </div>
-            <div className={`p-5 rounded-2xl border backdrop-blur-md shadow-sm ${
+            <div className={`p-5 rounded-2xl border backdrop-blur-md shadow-sm cursor-pointer hover:scale-[1.02] transition-transform ${
               portalStatus.status === "ONLINE" ? "bg-emerald-500/10 border-emerald-500/20 text-emerald-700 dark:text-emerald-400" :
               portalStatus.status === "OFFLINE" ? "bg-red-500/10 border-red-500/20 text-red-700 dark:text-red-400" :
               "bg-amber-500/10 border-amber-500/20 text-amber-700 dark:text-amber-400"
-            }`}>
-              <div className="font-bold text-xl mb-1">{portalStatus.status}</div>
+            }`}
+            onClick={() => window.open("https://eportal.oauife.edu.ng/", "_blank")}
+            >
+              <div className="font-bold text-xl mb-1 flex items-center justify-between">
+                {portalStatus.status}
+                <Activity size={16} className={portalStatus.status === "ONLINE" ? "animate-pulse" : ""} />
+              </div>
               <div className="text-sm opacity-80 font-medium">{portalStatus.message}</div>
+              <div className="mt-2 text-[10px] uppercase tracking-widest opacity-50">Click to visit OAU E-Portal</div>
             </div>
           </div>
         </div>
@@ -180,7 +186,7 @@ export default function Home({ user }: { user: any }) {
       </div>
 
       {/* Quick Links Grid */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <Link to="/cbt" className="glass-panel hover:bg-black/5 dark:hover:bg-white/10 p-6 rounded-3xl transition-all group">
           <BookOpen className="text-blue-600 dark:text-blue-400 mb-4 group-hover:scale-110 transition-transform" size={32} />
           <h3 className="text-lg font-bold mb-2">CBT Engine</h3>
@@ -196,6 +202,11 @@ export default function Home({ user }: { user: any }) {
           <h3 className="text-lg font-bold mb-2">Leaderboard</h3>
           <p className="text-sm text-[var(--foreground)]/60 font-medium">Rankings by Study Time. Dominate your peers.</p>
         </Link>
+        <a href="https://eportal.oauife.edu.ng/" target="_blank" rel="noopener noreferrer" className="glass-panel hover:bg-black/5 dark:hover:bg-white/10 p-6 rounded-3xl transition-all group">
+          <Activity className="text-purple-600 dark:text-purple-400 mb-4 group-hover:scale-110 transition-transform" size={32} />
+          <h3 className="text-lg font-bold mb-2">OAU Portal</h3>
+          <p className="text-sm text-[var(--foreground)]/60 font-medium">Direct access to the official OAU E-Portal.</p>
+        </a>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 mt-8">
@@ -203,7 +214,7 @@ export default function Home({ user }: { user: any }) {
           <FlashcardEngine />
         </div>
         <div className="lg:col-span-2 glass-panel p-6 rounded-3xl">
-          <ResourceVault />
+          <ResourceVault user={user} isAdmin={user?.email === "banmekeifeoluwa@gmail.com"} />
         </div>
       </div>
     </motion.div>

@@ -6,10 +6,11 @@ import { onAuthStateChanged, signInWithPopup, GoogleAuthProvider, signOut, brows
 import { auth, db } from "./firebase";
 import { doc, getDoc, setDoc, updateDoc } from "firebase/firestore";
 import { handleFirestoreError, OperationType } from "./utils/errorHandling";
-import { LogIn, LogOut, ShieldAlert, Sun, Moon, Calculator, Share2, Menu, X, User, BadgeCheck, Flame, Loader2 } from "lucide-react";
+import { LogIn, LogOut, ShieldAlert, Sun, Moon, Calculator, Share2, Menu, X, User, BadgeCheck, Flame, Loader2, Zap, HelpCircle, Users } from "lucide-react";
 import { clsx } from "clsx";
 import NexusBadge from "./components/NexusBadge";
 import Toast from "./components/Toast";
+import { updateNexusStreak } from "./utils/nexusUtils";
 
 // Lazy load pages for code splitting (low bandwidth optimization)
 const Home = lazy(() => import("./pages/Home"));
@@ -21,11 +22,16 @@ const GPA = lazy(() => import("./pages/GPA"));
 const Aro = lazy(() => import("./pages/Aro"));
 const Profile = lazy(() => import("./pages/Profile"));
 const Setup = lazy(() => import("./pages/Setup"));
+const About = lazy(() => import("./pages/About"));
+const Community = lazy(() => import("./pages/Community"));
+
+import { ErrorBoundary } from "./components/ErrorBoundary";
+import LoadingLogo from "./components/LoadingLogo";
+import Tutorial from "./components/Tutorial";
 
 const LoadingFallback = () => (
-  <div className="min-h-[60vh] flex flex-col items-center justify-center text-[var(--foreground)]/60">
-    <Loader2 className="animate-spin mb-4 text-blue-500" size={40} />
-    <p className="font-medium">Loading Nexus...</p>
+  <div className="min-h-[60vh] flex flex-col items-center justify-center">
+    <LoadingLogo />
   </div>
 );
 
@@ -34,6 +40,7 @@ function MainApp() {
   const [dbUser, setDbUser] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [showTutorial, setShowTutorial] = useState(false);
   const { theme, setTheme } = useTheme();
   const location = useLocation();
 
@@ -59,6 +66,10 @@ function MainApp() {
               isShana: false,
               cbtTimeSpent: 0,
               highScoreCount: 0,
+              currentStreak: 0,
+              lastActiveDate: new Date().toISOString().split('T')[0],
+              dailyTokenCount: 0,
+              lastTokenReset: new Date().toISOString().split('T')[0],
               shanaPeriodStart: Date.now(),
               createdAt: new Date().toISOString()
             } : {
@@ -72,6 +83,10 @@ function MainApp() {
               isShana: false,
               cbtTimeSpent: 0,
               highScoreCount: 0,
+              currentStreak: 0,
+              lastActiveDate: new Date().toISOString().split('T')[0],
+              dailyTokenCount: 0,
+              lastTokenReset: new Date().toISOString().split('T')[0],
               shanaPeriodStart: Date.now(),
               createdAt: new Date().toISOString()
             };
@@ -109,14 +124,21 @@ function MainApp() {
             }
             
             setDbUser(userData);
+            
+            // Update streak
+            updateNexusStreak(currentUser.uid).then(newStreak => {
+              setDbUser((prev: any) => prev ? { ...prev, currentStreak: newStreak } : prev);
+            });
           }
         } catch (error) {
           handleFirestoreError(error, OperationType.GET, "users");
+        } finally {
+          setLoading(false);
         }
       } else {
         setDbUser(null);
+        setLoading(false);
       }
-      setLoading(false);
     });
     return () => unsubscribe();
   }, []);
@@ -154,22 +176,34 @@ function MainApp() {
   };
 
   if (loading) {
-    return <div className="min-h-screen flex items-center justify-center bg-[var(--background)] text-[var(--foreground)]">Loading Nexus...</div>;
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-[var(--background)] text-[var(--foreground)]">
+        <LoadingLogo />
+      </div>
+    );
   }
 
   const navLinks = [
     { path: "/cbt", label: "CBT Engine" },
     { path: "/validate", label: "Validator" },
     { path: "/leaderboard", label: "Leaderboard" },
-    { path: "/gpa", label: "CGPA", icon: <Calculator size={14} /> },
-    { path: "/aro", label: "Aro Gen", icon: <Share2 size={14} /> },
+    { path: "/community", label: "Community", icon: <Users size={14} /> },
+    { path: "/about", label: "About", icon: <Zap size={14} /> },
   ];
 
   return (
     <div className="min-h-screen bg-[var(--background)] text-[var(--foreground)] font-sans transition-colors duration-300">
       <Helmet>
         <title>ICEPAB Nexus | OAU Digital Hub</title>
-        <meta name="description" content="The ultimate digital hub for OAU students. Access CBT practice, CGPA calculator, Leaderboard, and more." />
+        <meta name="description" content="The ultimate digital hub for OAU students. Access CBT practice, CGPA calculator, Leaderboard, and more. Built for excellence." />
+        <meta name="keywords" content="OAU, Obafemi Awolowo University, CBT, GST 111, CGPA Calculator, OAU Portal, Digital Nexus, ICEPAB" />
+        <meta property="og:title" content="ICEPAB Nexus | OAU Digital Hub" />
+        <meta property="og:description" content="Empowering OAU students with digital tools for academic success. Practice CBT, track GPA, and stay updated." />
+        <meta property="og:type" content="website" />
+        <meta property="og:url" content="https://icepab-nexus.run.app/" />
+        <meta property="og:image" content="https://icepab-nexus.run.app/og-image.png" />
+        <meta name="twitter:card" content="summary_large_image" />
+        <meta name="theme-color" content="#2563eb" />
       </Helmet>
       <nav className="border-b border-[var(--border)] p-4 sticky top-0 bg-[var(--background)]/80 backdrop-blur-xl z-50 shadow-sm">
         <div className="max-w-7xl mx-auto flex justify-between items-center">
@@ -201,8 +235,21 @@ function MainApp() {
               {theme === 'dark' ? <Sun size={18} /> : <Moon size={18} />}
             </button>
 
+            <button 
+              onClick={() => setShowTutorial(true)}
+              className="p-2 rounded-full hover:bg-black/5 dark:hover:bg-white/10 transition-colors text-blue-500"
+              aria-label="How to use"
+            >
+              <HelpCircle size={18} />
+            </button>
+
             {user ? (
               <div className="flex items-center gap-3">
+                {dbUser?.currentStreak > 0 && (
+                  <div className="flex items-center gap-1 bg-orange-500/10 text-orange-600 dark:text-orange-400 px-3 py-1.5 rounded-full font-bold text-xs border border-orange-500/20 animate-pulse">
+                    <Flame size={14} fill="currentColor" /> {dbUser.currentStreak} Day Streak
+                  </div>
+                )}
                 {user.email === "banmekeifeoluwa@gmail.com" && (
                    <Link to="/icepab-admin" className="hidden sm:flex text-xs bg-red-500/10 text-red-600 dark:text-red-400 px-3 py-1.5 rounded-full items-center gap-1.5 font-bold border border-red-500/20 hover:bg-red-500/20 transition-colors">
                      <ShieldAlert size={14} /> Admin
@@ -212,7 +259,7 @@ function MainApp() {
                   <img src={user.photoURL} alt="Avatar" loading="lazy" decoding="async" className="w-8 h-8 rounded-full border border-[var(--border)]" />
                   <span className="text-sm font-bold truncate max-w-[100px] flex items-center gap-1">
                     {dbUser?.displayName || user.displayName}
-                    <NexusBadge isVerified={dbUser?.isVerified} badgeType={dbUser?.badgeType} isShana={dbUser?.isShana} />
+                    <NexusBadge isVerified={dbUser?.isVerified} badgeType={dbUser?.badgeType} isShana={dbUser?.isShana} badges={dbUser?.badges} />
                   </span>
                 </Link>
                 <button onClick={logout} className="p-2 rounded-full hover:bg-black/5 dark:hover:bg-white/10 transition-colors text-red-500" aria-label="Log out">
@@ -242,7 +289,7 @@ function MainApp() {
                 <div className="flex flex-col">
                   <span className="font-bold flex items-center gap-1">
                     {dbUser?.displayName || user.displayName}
-                    <NexusBadge isVerified={dbUser?.isVerified} badgeType={dbUser?.badgeType} isShana={dbUser?.isShana} />
+                    <NexusBadge isVerified={dbUser?.isVerified} badgeType={dbUser?.badgeType} isShana={dbUser?.isShana} badges={dbUser?.badges} />
                   </span>
                   <span className="text-xs text-[var(--foreground)]/50">View Profile & Verify</span>
                 </div>
@@ -293,9 +340,22 @@ function MainApp() {
             <Route path="/aro" element={<Aro user={user} />} />
             <Route path="/profile" element={<Profile user={user} />} />
             <Route path="/setup" element={<Setup user={user} dbUser={dbUser} setDbUser={setDbUser} />} />
+            <Route path="/about" element={<About />} />
+            <Route path="/community" element={<Community user={user} />} />
           </Routes>
         </Suspense>
       </main>
+
+      <footer className="max-w-7xl mx-auto p-8 border-t border-[var(--border)] text-center space-y-4 opacity-60">
+        <p className="text-sm font-medium">
+          Copyright ©️ Clement IfeOluwa ❄️🧊 {new Date().getFullYear()}
+        </p>
+        <p className="text-xs">
+          Lead Developer: Clement IfeOluwa ❄️🧊 | Co-developer: Nova xit
+        </p>
+      </footer>
+
+      {showTutorial && <Tutorial onClose={() => setShowTutorial(false)} />}
       <Toast />
     </div>
   );
@@ -306,7 +366,9 @@ export default function App() {
     <HelmetProvider>
       <ThemeProvider defaultTheme="dark" storageKey="vite-ui-theme">
         <Router>
-          <MainApp />
+          <ErrorBoundary>
+            <MainApp />
+          </ErrorBoundary>
         </Router>
       </ThemeProvider>
     </HelmetProvider>

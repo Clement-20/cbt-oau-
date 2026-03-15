@@ -2,8 +2,11 @@ import React, { useState, useRef } from "react";
 import { collection, addDoc, serverTimestamp } from "firebase/firestore";
 import { db } from "../firebase";
 import { Course, Question } from "../lib/questions";
-import { X, Plus, Trash2, Upload, Loader2, FileText, BookOpen } from "lucide-react";
+import { X, Plus, Trash2, Upload, Loader2, FileText, BookOpen, BatteryLow } from "lucide-react";
 import { GoogleGenAI, Type } from "@google/genai";
+import { checkAndUseNexusEnergy } from "../utils/nexusUtils";
+import NexusEnergyModal from "./NexusEnergyModal";
+import { handleFirestoreError, OperationType } from "../utils/errorHandling";
 
 interface HostTestModalProps {
   user: any;
@@ -16,12 +19,14 @@ export default function HostTestModal({ user, courses, onClose }: HostTestModalP
   const [selectedCourse, setSelectedCourse] = useState("");
   const [numQuestions, setNumQuestions] = useState(10);
   const [maxAttempts, setMaxAttempts] = useState(1);
+  const [duration, setDuration] = useState(15); // Default 15 minutes
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState("");
   const [mode, setMode] = useState<"course" | "pdf">("course");
   
   const [file, setFile] = useState<File | null>(null);
   const [pdfCourseCode, setPdfCourseCode] = useState("");
+  const [showEnergyModal, setShowEnergyModal] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -60,6 +65,24 @@ export default function HostTestModal({ user, courses, onClose }: HostTestModalP
       } else {
         if (!file || !pdfCourseCode) {
           setError("Please provide a course code and upload a file.");
+          setIsSubmitting(false);
+          return;
+        }
+
+        // 1. Check Cache
+        const cacheKey = `nexus_extract_${file.name}_${file.size}`;
+        const cached = localStorage.getItem(cacheKey);
+        if (cached) {
+          console.log("Loading from Nexus Cache...");
+          const extractedQuestions = JSON.parse(cached);
+          await createTestDocument(extractedQuestions, pdfCourseCode.toUpperCase());
+          return;
+        }
+
+        // 2. Check Quota
+        const { allowed } = await checkAndUseNexusEnergy(user.uid);
+        if (!allowed) {
+          setShowEnergyModal(true);
           setIsSubmitting(false);
           return;
         }
@@ -105,6 +128,10 @@ export default function HostTestModal({ user, courses, onClose }: HostTestModalP
               return;
             }
 
+            // Save to cache
+            const cacheKey = `nexus_extract_${file.name}_${file.size}`;
+            localStorage.setItem(cacheKey, JSON.stringify(extractedQuestions));
+
             await createTestDocument(extractedQuestions, pdfCourseCode.toUpperCase());
           } catch (err: any) {
             console.error("Error processing file:", err);
@@ -128,15 +155,21 @@ export default function HostTestModal({ user, courses, onClose }: HostTestModalP
       hostId: user.uid,
       hostName: user.displayName || "Verified User",
       questions: questions,
+      duration: duration, // in minutes
       createdAt: Date.now(),
       expiresAt: Date.now() + 24 * 60 * 60 * 1000, // 24 hours from now
       status: "active",
       maxAttempts: maxAttempts
     };
 
-    await addDoc(collection(db, "hosted_tests"), testData);
-    setIsSubmitting(false);
-    onClose();
+    try {
+      await addDoc(collection(db, "hosted_tests"), testData);
+      setIsSubmitting(false);
+      onClose();
+    } catch (error) {
+      handleFirestoreError(error, OperationType.CREATE, "hosted_tests");
+      throw error; // Re-throw to be caught by the caller
+    }
   };
 
   return (
@@ -258,6 +291,19 @@ export default function HostTestModal({ user, courses, onClose }: HostTestModalP
             />
           </div>
 
+          <div>
+            <label className="block text-sm font-medium mb-1">Test Duration (Minutes)</label>
+            <input 
+              type="number" 
+              value={duration}
+              onChange={(e) => setDuration(parseInt(e.target.value) || 15)}
+              min={1}
+              max={180}
+              className="w-full p-3 rounded-xl bg-black/5 dark:bg-white/5 border border-[var(--border)] focus:outline-none focus:ring-2 focus:ring-blue-500"
+              required
+            />
+          </div>
+
           <button 
             type="submit" 
             disabled={isSubmitting || (mode === "pdf" && !file)}
@@ -267,6 +313,7 @@ export default function HostTestModal({ user, courses, onClose }: HostTestModalP
           </button>
         </form>
       </div>
+      {showEnergyModal && <NexusEnergyModal onClose={() => setShowEnergyModal(false)} />}
     </div>
   );
 }

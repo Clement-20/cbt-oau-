@@ -74,6 +74,34 @@
         "timestamp": { "type": "number" }
       },
       "required": ["testId", "userId", "userName", "score", "totalQuestions", "timestamp"]
+    },
+    "Resource": {
+      "title": "Resource",
+      "description": "A study resource in the vault",
+      "type": "object",
+      "properties": {
+        "title": { "type": "string" },
+        "type": { "type": "string", "enum": ["PDF", "Link"] },
+        "url": { "type": "string" },
+        "course": { "type": "string" },
+        "uploadedBy": { "type": "string" },
+        "userId": { "type": "string" },
+        "timestamp": { "type": "string", "format": "date-time" }
+      },
+      "required": ["title", "type", "url", "course", "uploadedBy", "userId"]
+    },
+    "CommunityReview": {
+      "title": "Community Review",
+      "description": "A user review or feedback",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "userName": { "type": "string" },
+        "text": { "type": "string" },
+        "rating": { "type": "number" },
+        "timestamp": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userId", "userName", "text", "rating"]
     }
   },
   "firestore": {
@@ -96,6 +124,14 @@
     "/test_results/{resultId}": {
       "schema": { "$ref": "#/entities/TestResult" },
       "description": "Stores results for hosted tests"
+    },
+    "/resources/{resourceId}": {
+      "schema": { "$ref": "#/entities/Resource" },
+      "description": "Stores study resources"
+    },
+    "/community_reviews/{reviewId}": {
+      "schema": { "$ref": "#/entities/CommunityReview" },
+      "description": "Stores community reviews"
     }
   }
 }

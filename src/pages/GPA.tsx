@@ -62,7 +62,7 @@ export default function GPA({ user }: { user: any }) {
       calculateGPA();
       toast("CGPA data saved securely.");
     } catch (error) {
-      console.error("Error saving GPA:", error);
+      handleFirestoreError(error, OperationType.WRITE, `users/${user.uid}/private/academic`);
       toast("Failed to save data.");
     } finally {
       setSaving(false);
@@ -100,11 +100,21 @@ export default function GPA({ user }: { user: any }) {
         <title>CGPA Calculator | ICEPAB Nexus</title>
         <meta name="description" content="Calculate and track your OAU CGPA privately on the ICEPAB Nexus." />
       </Helmet>
-      <div>
-        <h1 className="text-3xl font-bold tracking-tighter flex items-center gap-3">
-          <Calculator className="text-blue-500" /> CGPA Calculator
-        </h1>
-        <p className="text-[var(--foreground)]/60 mt-2 font-medium">Your academic data is private and only visible to you.</p>
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div>
+          <h1 className="text-3xl font-bold tracking-tighter flex items-center gap-3">
+            <Calculator className="text-blue-500" /> CGPA Calculator
+          </h1>
+          <p className="text-[var(--foreground)]/60 mt-2 font-medium">Your academic data is private and only visible to you.</p>
+        </div>
+        <a 
+          href="https://eportal.oauife.edu.ng/" 
+          target="_blank" 
+          rel="noopener noreferrer"
+          className="flex items-center gap-2 bg-emerald-600/10 text-emerald-600 dark:text-emerald-400 px-4 py-2 rounded-xl font-bold text-sm border border-emerald-500/20 hover:bg-emerald-600/20 transition-colors"
+        >
+          Visit OAU E-Portal
+        </a>
       </div>
 
       <div className="glass-panel p-6 md:p-8 rounded-3xl space-y-6">

@@ -100,7 +100,7 @@ export default function TestMetricsModal({ testId, testTitle, onClose }: TestMet
               <p>No one has taken this test yet.</p>
             </div>
           ) : (
-            Object.values(
+            (Object.values(
               results.reduce((acc, result) => {
                 if (!acc[result.userId]) {
                   acc[result.userId] = {
@@ -116,7 +116,7 @@ export default function TestMetricsModal({ testId, testTitle, onClose }: TestMet
                 }
                 return acc;
               }, {} as Record<string, TestResult & { attempts: number; bestScore: number }>)
-            )
+            ) as (TestResult & { attempts: number; bestScore: number })[])
             .sort((a, b) => b.bestScore - a.bestScore)
             .map((result, index) => (
               <div key={result.id} className="flex items-center justify-between p-4 rounded-2xl bg-black/5 dark:bg-white/5 border border-[var(--border)]">

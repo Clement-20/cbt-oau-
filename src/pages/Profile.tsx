@@ -51,7 +51,7 @@ export default function Profile({ user }: { user: any }) {
       await updateDoc(docRef, { displayName });
       toast("Profile updated successfully!");
     } catch (error) {
-      console.error("Error updating profile:", error);
+      handleFirestoreError(error, OperationType.UPDATE, `users/${user.uid}`);
       toast("Failed to update profile.");
     } finally {
       setSaving(false);
@@ -81,7 +81,7 @@ export default function Profile({ user }: { user: any }) {
         setVerifyStep("success");
         setFile(null); // "Delete" the file after verification
       } catch (error) {
-        console.error("Verification failed:", error);
+        handleFirestoreError(error, OperationType.UPDATE, `users/${user.uid}`);
         toast("Payment succeeded but verification failed. Please contact admin.");
         setVerifyStep("idle");
       }
