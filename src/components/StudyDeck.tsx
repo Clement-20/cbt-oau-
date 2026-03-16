@@ -68,11 +68,31 @@ export default function StudyDeck({ user, onClose, contextText, initialPrompt }:
         }
       });
 
-      const response = await chat.sendMessage({ message: messageToSend });
-      setMessages(prev => [...prev, { role: "model", text: response.text || "I'm sorry, I couldn't process that." }]);
+      // Add a placeholder for the model response
+      setMessages(prev => [...prev, { role: "model", text: "" }]);
+      
+      const streamResponse = await chat.sendMessageStream({ message: messageToSend });
+      
+      for await (const chunk of streamResponse) {
+        setMessages(prev => {
+          const newMessages = [...prev];
+          const lastMessage = newMessages[newMessages.length - 1];
+          lastMessage.text += chunk.text;
+          return newMessages;
+        });
+      }
     } catch (error) {
       console.error("Chat error:", error);
-      setMessages(prev => [...prev, { role: "model", text: "Nexus connection interrupted. Please try again." }]);
+      setMessages(prev => {
+        const newMessages = [...prev];
+        const lastMessage = newMessages[newMessages.length - 1];
+        if (lastMessage.role === "model" && lastMessage.text === "") {
+          lastMessage.text = "Nexus connection interrupted. Please try again.";
+        } else {
+          newMessages.push({ role: "model", text: "Nexus connection interrupted. Please try again." });
+        }
+        return newMessages;
+      });
     } finally {
       setIsLoading(false);
     }

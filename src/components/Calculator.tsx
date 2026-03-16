@@ -30,7 +30,7 @@ export default function Calculator({ onClose }: { onClose: () => void }) {
   };
 
   return (
-    <div className="fixed bottom-20 right-4 z-[60] w-64 bg-zinc-900 border border-zinc-800 rounded-3xl shadow-2xl overflow-hidden animate-in slide-in-from-bottom-4">
+    <div className="fixed bottom-20 right-4 z-[60] w-64 bg-white dark:bg-zinc-900 border border-[var(--border)] rounded-3xl shadow-2xl overflow-hidden animate-in slide-in-from-bottom-4">
       <div className="bg-zinc-800 p-4 flex justify-between items-center">
         <span className="text-xs font-bold text-zinc-400 uppercase tracking-widest">Nexus Calc</span>
         <button onClick={onClose} className="text-zinc-400 hover:text-white transition-colors">

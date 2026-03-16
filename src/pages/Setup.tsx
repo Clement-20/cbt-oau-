@@ -74,7 +74,7 @@ export default function Setup({ user, dbUser, setDbUser }: { user: any, dbUser: 
         <title>Setup Profile | ICEPAB Nexus</title>
         <meta name="robots" content="noindex, nofollow" />
       </Helmet>
-      <div className="max-w-md w-full bg-zinc-900/50 border border-zinc-800 p-8 rounded-3xl shadow-2xl backdrop-blur-xl">
+      <div className="max-w-md w-full bg-black/5 dark:bg-black/50 border border-[var(--border)] p-8 rounded-3xl shadow-2xl backdrop-blur-xl">
         <div className="text-center mb-8">
           <h1 className="text-3xl font-bold text-cyan-400 mb-2">Complete Profile</h1>
           <p className="text-zinc-400">Set up your OAU Digital Nexus identity.</p>

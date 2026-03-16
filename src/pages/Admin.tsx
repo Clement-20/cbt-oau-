@@ -1,11 +1,12 @@
 import React, { useState, useEffect } from "react";
-import { collection, addDoc, serverTimestamp, query, where, getDocs, updateDoc, doc, increment, deleteDoc, orderBy, limit } from "firebase/firestore";
+import { collection, addDoc, serverTimestamp, query, where, getDocs, updateDoc, doc, increment, deleteDoc, orderBy, limit, writeBatch } from "firebase/firestore";
 import { handleFirestoreError, OperationType } from "../utils/errorHandling";
 import { db } from "../firebase";
 import { ShieldAlert, Send, Search, BadgeCheck, Loader2, CheckCircle, Trash2, FileText, BookOpen } from "lucide-react";
 import { Helmet } from "react-helmet-async";
 import { toast } from "../components/Toast";
 import ConfirmModal from "../components/ConfirmModal";
+import { getSettings, updateSettings } from "../lib/settings";
 
 export default function Admin({ user }: { user: any }) {
   const [message, setMessage] = useState("");
@@ -16,37 +17,40 @@ export default function Admin({ user }: { user: any }) {
   const [searchLoading, setSearchLoading] = useState(false);
 
   const [unverifiedUsers, setUnverifiedUsers] = useState<any[]>([]);
+  const [paymentVerifications, setPaymentVerifications] = useState<any[]>([]);
   const [queueLoading, setQueueLoading] = useState(true);
 
   const [contentSearch, setContentSearch] = useState("");
   const [contentResults, setContentResults] = useState<{ courses: any[], resources: any[] }>({ courses: [], resources: [] });
   const [contentLoading, setContentLoading] = useState(false);
   const [deleteConfirm, setDeleteConfirm] = useState<{id: string, type: 'course' | 'resource'} | null>(null);
+  const [isPaymentEnabled, setIsPaymentEnabled] = useState(true);
 
   useEffect(() => {
     if (!user || user.email !== "banmekeifeoluwa@gmail.com") return;
 
+    getSettings().then(s => setIsPaymentEnabled(s.isPaymentEnabled)).catch(console.error);
+
     const fetchQueue = async () => {
       try {
-        const q = query(
-          collection(db, "users"), 
-          where("isVerified", "==", false),
-          limit(20)
-        );
-        const snapshot = await getDocs(q);
+        const [usersSnap, paymentsSnap] = await Promise.all([
+          getDocs(query(collection(db, "users"), where("isVerified", "==", false), limit(20))),
+          getDocs(query(collection(db, "payment_verifications"), where("status", "==", "pending"), limit(20)))
+        ]);
+        
         const users: any[] = [];
-        snapshot.forEach((doc) => {
+        usersSnap.forEach((doc) => {
           users.push({ id: doc.id, ...doc.data() });
         });
-        // Sort locally to avoid composite index requirement
         users.sort((a, b) => {
           const dateA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
           const dateB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
           return dateB - dateA;
         });
         setUnverifiedUsers(users);
+        setPaymentVerifications(paymentsSnap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
       } catch (error) {
-        handleFirestoreError(error, OperationType.GET, "users");
+        handleFirestoreError(error, OperationType.GET, "users/payment_verifications");
       } finally {
         setQueueLoading(false);
       }
@@ -63,8 +67,36 @@ export default function Admin({ user }: { user: any }) {
         xp: increment(500)
       });
       setUnverifiedUsers(prev => prev.filter(u => u.id !== userId));
+      toast("User verified successfully!");
     } catch (error) {
       handleFirestoreError(error, OperationType.UPDATE, `users/${userId}`);
+      toast("Failed to verify user.");
+    }
+  };
+
+  const approvePayment = async (paymentId: string, userId: string) => {
+    try {
+      const batch = writeBatch(db);
+      batch.update(doc(db, "payment_verifications", paymentId), { status: "approved" });
+      batch.update(doc(db, "users", userId), { isVerified: true, xp: increment(500) });
+      await batch.commit();
+      
+      setPaymentVerifications(prev => prev.filter(p => p.id !== paymentId));
+      toast("Payment verified and user updated!");
+    } catch (error) {
+      handleFirestoreError(error, OperationType.UPDATE, `payment_verifications/${paymentId}`);
+      toast("Failed to verify payment.");
+    }
+  };
+
+  const togglePayment = async () => {
+    const newState = !isPaymentEnabled;
+    try {
+      await updateSettings({ isPaymentEnabled: newState });
+      setIsPaymentEnabled(newState);
+      toast(`Payment verification is now ${newState ? "enabled" : "disabled"}`);
+    } catch (error) {
+      toast("Failed to update settings.");
     }
   };
 
@@ -147,7 +179,7 @@ export default function Admin({ user }: { user: any }) {
       const coursesSnap = await getDocs(coursesQ);
       const courses = coursesSnap.docs
         .map(doc => ({ id: doc.id, ...doc.data() }))
-        .filter((c: any) => c.courseCode?.toLowerCase().includes(contentSearch.toLowerCase()) || c.courseTitle?.toLowerCase().includes(contentSearch.toLowerCase()));
+        .filter((c: any) => c.code?.toLowerCase().includes(contentSearch.toLowerCase()) || c.title?.toLowerCase().includes(contentSearch.toLowerCase()));
 
       // Search Resources
       const resourcesQ = query(collection(db, "resources"), limit(500));
@@ -223,6 +255,21 @@ export default function Admin({ user }: { user: any }) {
         </form>
       </div>
 
+      <div className="glass-panel p-8 rounded-3xl shadow-sm flex items-center justify-between">
+        <div>
+          <h2 className="text-2xl font-bold">App Settings</h2>
+          <p className="text-sm text-[var(--foreground)]/60 font-medium">
+            Toggle payment verification visibility.
+          </p>
+        </div>
+        <button 
+          onClick={togglePayment}
+          className={`px-6 py-3 rounded-xl font-bold transition-colors ${isPaymentEnabled ? 'bg-emerald-600 text-white' : 'bg-red-600 text-white'}`}
+        >
+          {isPaymentEnabled ? "Enabled" : "Disabled"}
+        </button>
+      </div>
+
       <div className="glass-panel p-8 rounded-3xl shadow-sm space-y-6">
         <h2 className="text-2xl font-bold mb-2">Verification Queue</h2>
         <p className="text-sm text-[var(--foreground)]/60 mb-6 font-medium">
@@ -231,48 +278,84 @@ export default function Admin({ user }: { user: any }) {
 
         {queueLoading ? (
           <div className="p-10 text-center text-[var(--foreground)]/50 font-medium">Loading queue...</div>
-        ) : unverifiedUsers.length === 0 ? (
+        ) : unverifiedUsers.length === 0 && paymentVerifications.length === 0 ? (
           <div className="p-10 text-center text-[var(--foreground)]/50 font-medium flex flex-col items-center justify-center">
             <CheckCircle className="text-emerald-500 mb-2" size={32} />
             All caught up! No pending verifications.
           </div>
         ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-left border-collapse">
-              <thead>
-                <tr className="bg-black/5 dark:bg-white/5 text-xs font-bold text-[var(--foreground)]/50 uppercase tracking-widest border-b border-[var(--border)]">
-                  <th className="p-4">Student</th>
-                  <th className="p-4">Matric Number</th>
-                  <th className="p-4">Faculty / Dept</th>
-                  <th className="p-4 text-right">Action</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-[var(--border)]">
-                {unverifiedUsers.map((u) => (
-                  <tr key={u.id} className="hover:bg-black/5 dark:hover:bg-white/5 transition-colors">
-                    <td className="p-4">
-                      <div className="flex items-center gap-3">
-                        <img src={u.photoURL || `https://api.dicebear.com/7.x/avataaars/svg?seed=${u.uid}`} alt={u.displayName} loading="lazy" decoding="async" className="w-10 h-10 rounded-full border border-[var(--border)]" />
-                        <span className="font-bold">{u.displayName}</span>
-                      </div>
-                    </td>
-                    <td className="p-4 font-mono text-sm">{u.matricNumber}</td>
-                    <td className="p-4">
-                      <div className="text-sm font-medium">{u.faculty}</div>
-                      <div className="text-xs text-[var(--foreground)]/50">{u.department}</div>
-                    </td>
-                    <td className="p-4 text-right">
-                      <button 
-                        onClick={() => approveUser(u.id)}
-                        className="bg-emerald-600 hover:bg-emerald-500 text-white px-4 py-2 rounded-lg text-sm font-bold transition-colors shadow-sm inline-flex items-center gap-2"
-                      >
-                        <CheckCircle size={16} /> Approve
-                      </button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+          <div className="space-y-8">
+            {unverifiedUsers.length > 0 && (
+              <div className="overflow-x-auto">
+                <h3 className="text-lg font-bold mb-4">Student Verifications</h3>
+                <table className="w-full text-left border-collapse">
+                  <thead>
+                    <tr className="bg-black/5 dark:bg-white/5 text-xs font-bold text-[var(--foreground)]/50 uppercase tracking-widest border-b border-[var(--border)]">
+                      <th className="p-4">Student</th>
+                      <th className="p-4">Matric Number</th>
+                      <th className="p-4">Faculty / Dept</th>
+                      <th className="p-4 text-right">Action</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-[var(--border)]">
+                    {unverifiedUsers.map((u) => (
+                      <tr key={u.id} className="hover:bg-black/5 dark:hover:bg-white/5 transition-colors">
+                        <td className="p-4">
+                          <div className="flex items-center gap-3">
+                            <img src={u.photoURL || `https://api.dicebear.com/7.x/avataaars/svg?seed=${u.uid}`} alt={u.displayName} loading="lazy" decoding="async" className="w-10 h-10 rounded-full border border-[var(--border)]" />
+                            <span className="font-bold">{u.displayName}</span>
+                          </div>
+                        </td>
+                        <td className="p-4 font-mono text-sm">{u.matricNumber}</td>
+                        <td className="p-4">
+                          <div className="text-sm font-medium">{u.faculty}</div>
+                          <div className="text-xs text-[var(--foreground)]/50">{u.department}</div>
+                        </td>
+                        <td className="p-4 text-right">
+                          <button 
+                            onClick={() => approveUser(u.id)}
+                            className="bg-emerald-600 hover:bg-emerald-500 text-white px-4 py-2 rounded-lg text-sm font-bold transition-colors shadow-sm inline-flex items-center gap-2"
+                          >
+                            <CheckCircle size={16} /> Approve
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+            
+            {paymentVerifications.length > 0 && (
+              <div className="overflow-x-auto">
+                <h3 className="text-lg font-bold mb-4">Payment Verifications</h3>
+                <table className="w-full text-left border-collapse">
+                  <thead>
+                    <tr className="bg-black/5 dark:bg-white/5 text-xs font-bold text-[var(--foreground)]/50 uppercase tracking-widest border-b border-[var(--border)]">
+                      <th className="p-4">Student Email</th>
+                      <th className="p-4">Reference</th>
+                      <th className="p-4 text-right">Action</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-[var(--border)]">
+                    {paymentVerifications.map((p) => (
+                      <tr key={p.id} className="hover:bg-black/5 dark:hover:bg-white/5 transition-colors">
+                        <td className="p-4 font-bold">{p.email}</td>
+                        <td className="p-4 font-mono text-sm">{p.reference}</td>
+                        <td className="p-4 text-right">
+                          <button 
+                            onClick={() => approvePayment(p.id, p.userId)}
+                            className="bg-emerald-600 hover:bg-emerald-500 text-white px-4 py-2 rounded-lg text-sm font-bold transition-colors shadow-sm inline-flex items-center gap-2"
+                          >
+                            <CheckCircle size={16} /> Approve
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
           </div>
         )}
       </div>

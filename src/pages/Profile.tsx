@@ -5,6 +5,7 @@ import { db } from "../firebase";
 import { User, BadgeCheck, Upload, CreditCard, CheckCircle2, Loader2, Save, Flame, Clock, Target } from "lucide-react";
 import { Helmet } from "react-helmet-async";
 import { toast } from "../components/Toast";
+import { getSettings } from "../lib/settings";
 
 export default function Profile({ user }: { user: any }) {
   const [displayName, setDisplayName] = useState("");
@@ -14,6 +15,7 @@ export default function Profile({ user }: { user: any }) {
   const [highScoreCount, setHighScoreCount] = useState(0);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [isPaymentEnabled, setIsPaymentEnabled] = useState(true);
   
   // Verification Flow State
   // "idle" | "uploading" | "paying" | "success"
@@ -24,18 +26,21 @@ export default function Profile({ user }: { user: any }) {
     if (!user) return;
     const fetchProfile = async () => {
       try {
-        const docRef = doc(db, "users", user.uid);
-        const docSnap = await getDoc(docRef);
-        if (docSnap.exists()) {
-          const data = docSnap.data();
+        const [userSnap, settings] = await Promise.all([
+          getDoc(doc(db, "users", user.uid)),
+          getSettings()
+        ]);
+        if (userSnap.exists()) {
+          const data = userSnap.data();
           setDisplayName(data.displayName || "");
           setIsVerified(data.isVerified || false);
           setIsShana(data.isShana || false);
           setCbtTimeSpent(data.cbtTimeSpent || 0);
           setHighScoreCount(data.highScoreCount || 0);
         }
+        setIsPaymentEnabled(settings.isPaymentEnabled);
       } catch (error) {
-        handleFirestoreError(error, OperationType.GET, "users");
+        handleFirestoreError(error, OperationType.GET, "users/settings");
       } finally {
         setLoading(false);
       }
@@ -200,96 +205,98 @@ export default function Profile({ user }: { user: any }) {
       </div>
 
       {/* Verification Section */}
-      <div className="glass-panel p-8 rounded-3xl shadow-sm space-y-6 relative overflow-hidden">
-        {isVerified && (
-          <div className="absolute top-0 right-0 p-6 opacity-10 text-blue-500 pointer-events-none">
-            <BadgeCheck size={120} />
-          </div>
-        )}
-        
-        <h2 className="text-2xl font-bold flex items-center gap-2 relative z-10">
-          Verification Status
-          {isVerified && <BadgeCheck className="text-blue-500" size={24} />}
-        </h2>
-
-        {isVerified ? (
-          <div className="bg-blue-500/10 border border-blue-500/20 p-6 rounded-2xl relative z-10">
-            <div className="flex items-center gap-3 text-blue-700 dark:text-blue-400 font-bold text-lg mb-2">
-              <CheckCircle2 size={24} /> You are Verified!
+      {isPaymentEnabled && (
+        <div className="glass-panel p-8 rounded-3xl shadow-sm space-y-6 relative overflow-hidden">
+          {isVerified && (
+            <div className="absolute top-0 right-0 p-6 opacity-10 text-blue-500 pointer-events-none">
+              <BadgeCheck size={120} />
             </div>
-            <p className="text-[var(--foreground)]/70 font-medium">
-              You have the official ICEPAB Nexus blue tick. You stand out on the leaderboard and validator queue.
-            </p>
-          </div>
-        ) : (
-          <div className="space-y-6 relative z-10">
-            <p className="text-[var(--foreground)]/70 font-medium">
-              Get the official blue tick to stand out. Verification requires a one-time payment of ₦1,000 and a valid Student ID or Portal Biodata screenshot (deleted immediately after verification).
-            </p>
+          )}
+          
+          <h2 className="text-2xl font-bold flex items-center gap-2 relative z-10">
+            Verification Status
+            {isVerified && <BadgeCheck className="text-blue-500" size={24} />}
+          </h2>
 
-            {verifyStep === "idle" && (
-              <button
-                onClick={startVerification}
-                className="flex items-center justify-center gap-2 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white px-6 py-4 rounded-2xl font-bold transition-all shadow-md w-full sm:w-auto"
-              >
-                <BadgeCheck size={20} /> Become Verified
-              </button>
-            )}
+          {isVerified ? (
+            <div className="bg-blue-500/10 border border-blue-500/20 p-6 rounded-2xl relative z-10">
+              <div className="flex items-center gap-3 text-blue-700 dark:text-blue-400 font-bold text-lg mb-2">
+                <CheckCircle2 size={24} /> You are Verified!
+              </div>
+              <p className="text-[var(--foreground)]/70 font-medium">
+                You have the official ICEPAB Nexus blue tick. You stand out on the leaderboard and validator queue.
+              </p>
+            </div>
+          ) : (
+            <div className="space-y-6 relative z-10">
+              <p className="text-[var(--foreground)]/70 font-medium">
+                Get the official blue tick to stand out. Verification requires a one-time payment of ₦1,000 and a valid Student ID or Portal Biodata screenshot (deleted immediately after verification).
+              </p>
 
-            {verifyStep === "uploading" && (
-              <div className="bg-black/5 dark:bg-white/5 border border-[var(--border)] p-6 rounded-2xl space-y-4 animate-in fade-in slide-in-from-bottom-4">
-                <h3 className="font-bold text-lg flex items-center gap-2"><Upload size={18} /> Step 1: Upload ID</h3>
-                <p className="text-sm text-[var(--foreground)]/60">Upload your Student ID or Portal Biodata screenshot. This will be securely processed and deleted.</p>
-                <input
-                  type="file"
-                  accept="image/*"
-                  onChange={handleFileUpload}
-                  className="w-full bg-black/5 dark:bg-black/50 border border-[var(--border)] rounded-xl p-3 text-[var(--foreground)]/60 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-bold file:bg-blue-500/10 file:text-blue-600 dark:file:text-blue-400 hover:file:bg-blue-500/20 transition-all cursor-pointer"
-                />
-                <div className="flex gap-3 pt-2">
-                  <button onClick={() => setVerifyStep("idle")} className="px-4 py-2 rounded-xl font-bold text-[var(--foreground)]/60 hover:bg-black/5 dark:hover:bg-white/10 transition-colors">Cancel</button>
-                  <button onClick={proceedToPayment} disabled={!file} className="flex-1 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-xl font-bold transition-colors disabled:opacity-50">Continue to Payment</button>
-                </div>
-              </div>
-            )}
+              {verifyStep === "idle" && (
+                <button
+                  onClick={startVerification}
+                  className="flex items-center justify-center gap-2 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white px-6 py-4 rounded-2xl font-bold transition-all shadow-md w-full sm:w-auto"
+                >
+                  <BadgeCheck size={20} /> Become Verified
+                </button>
+              )}
 
-            {verifyStep === "paying" && (
-              <div className="bg-black/5 dark:bg-white/5 border border-[var(--border)] p-6 rounded-2xl space-y-4 animate-in fade-in slide-in-from-bottom-4">
-                <h3 className="font-bold text-lg flex items-center gap-2"><CreditCard size={18} /> Step 2: Payment</h3>
-                <div className="bg-blue-500/10 border border-blue-500/20 p-4 rounded-xl text-center">
-                  <div className="text-sm font-bold text-blue-600 dark:text-blue-400 uppercase tracking-wider mb-1">Total Amount</div>
-                  <div className="text-3xl font-bold">₦1,000</div>
+              {verifyStep === "uploading" && (
+                <div className="bg-black/5 dark:bg-white/5 border border-[var(--border)] p-6 rounded-2xl space-y-4 animate-in fade-in slide-in-from-bottom-4">
+                  <h3 className="font-bold text-lg flex items-center gap-2"><Upload size={18} /> Step 1: Upload ID</h3>
+                  <p className="text-sm text-[var(--foreground)]/60">Upload your Student ID or Portal Biodata screenshot. This will be securely processed and deleted.</p>
+                  <input
+                    type="file"
+                    accept="image/*"
+                    onChange={handleFileUpload}
+                    className="w-full bg-black/5 dark:bg-black/50 border border-[var(--border)] rounded-xl p-3 text-[var(--foreground)]/60 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-bold file:bg-blue-500/10 file:text-blue-600 dark:file:text-blue-400 hover:file:bg-blue-500/20 transition-all cursor-pointer"
+                  />
+                  <div className="flex gap-3 pt-2">
+                    <button onClick={() => setVerifyStep("idle")} className="px-4 py-2 rounded-xl font-bold text-[var(--foreground)]/60 hover:bg-black/5 dark:hover:bg-white/10 transition-colors">Cancel</button>
+                    <button onClick={proceedToPayment} disabled={!file} className="flex-1 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-xl font-bold transition-colors disabled:opacity-50">Continue to Payment</button>
+                  </div>
                 </div>
-                <p className="text-sm text-[var(--foreground)]/60 text-center">This is a simulated payment for the prototype.</p>
-                <div className="flex gap-3 pt-2">
-                  <button onClick={() => setVerifyStep("uploading")} className="px-4 py-2 rounded-xl font-bold text-[var(--foreground)]/60 hover:bg-black/5 dark:hover:bg-white/10 transition-colors">Back</button>
-                  <button onClick={simulatePayment} className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-xl font-bold transition-colors flex justify-center items-center gap-2">
-                    Pay ₦1,000 Now
-                  </button>
-                </div>
-              </div>
-            )}
+              )}
 
-            {verifyStep === "processing" && (
-              <div className="bg-black/5 dark:bg-white/5 border border-[var(--border)] p-10 rounded-2xl flex flex-col items-center justify-center space-y-4">
-                <Loader2 className="animate-spin text-blue-500" size={40} />
-                <p className="font-bold text-lg">Processing Payment & Verifying ID...</p>
-                <p className="text-sm text-[var(--foreground)]/50">Please do not close this window.</p>
-              </div>
-            )}
-            
-            {verifyStep === "success" && (
-              <div className="bg-emerald-500/10 border border-emerald-500/20 p-8 rounded-2xl flex flex-col items-center justify-center space-y-4 text-center animate-in zoom-in">
-                <div className="w-16 h-16 bg-emerald-500 rounded-full flex items-center justify-center text-white shadow-lg shadow-emerald-500/30 mb-2">
-                  <CheckCircle2 size={32} />
+              {verifyStep === "paying" && (
+                <div className="bg-black/5 dark:bg-white/5 border border-[var(--border)] p-6 rounded-2xl space-y-4 animate-in fade-in slide-in-from-bottom-4">
+                  <h3 className="font-bold text-lg flex items-center gap-2"><CreditCard size={18} /> Step 2: Payment</h3>
+                  <div className="bg-blue-500/10 border border-blue-500/20 p-4 rounded-xl text-center">
+                    <div className="text-sm font-bold text-blue-600 dark:text-blue-400 uppercase tracking-wider mb-1">Total Amount</div>
+                    <div className="text-3xl font-bold">₦1,000</div>
+                  </div>
+                  <p className="text-sm text-[var(--foreground)]/60 text-center">This is a simulated payment for the prototype.</p>
+                  <div className="flex gap-3 pt-2">
+                    <button onClick={() => setVerifyStep("uploading")} className="px-4 py-2 rounded-xl font-bold text-[var(--foreground)]/60 hover:bg-black/5 dark:hover:bg-white/10 transition-colors">Back</button>
+                    <button onClick={simulatePayment} className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-xl font-bold transition-colors flex justify-center items-center gap-2">
+                      Pay ₦1,000 Now
+                    </button>
+                  </div>
                 </div>
-                <h3 className="font-bold text-2xl text-emerald-700 dark:text-emerald-400">Verification Complete!</h3>
-                <p className="text-[var(--foreground)]/70 font-medium">Your ID has been verified and deleted from our servers. Enjoy your blue tick!</p>
-              </div>
-            )}
-          </div>
-        )}
-      </div>
+              )}
+
+              {verifyStep === "processing" && (
+                <div className="bg-black/5 dark:bg-white/5 border border-[var(--border)] p-10 rounded-2xl flex flex-col items-center justify-center space-y-4">
+                  <Loader2 className="animate-spin text-blue-500" size={40} />
+                  <p className="font-bold text-lg">Processing Payment & Verifying ID...</p>
+                  <p className="text-sm text-[var(--foreground)]/50">Please do not close this window.</p>
+                </div>
+              )}
+              
+              {verifyStep === "success" && (
+                <div className="bg-emerald-500/10 border border-emerald-500/20 p-8 rounded-2xl flex flex-col items-center justify-center space-y-4 text-center animate-in zoom-in">
+                  <div className="w-16 h-16 bg-emerald-500 rounded-full flex items-center justify-center text-white shadow-lg shadow-emerald-500/30 mb-2">
+                    <CheckCircle2 size={32} />
+                  </div>
+                  <h3 className="font-bold text-2xl text-emerald-700 dark:text-emerald-400">Verification Complete!</h3>
+                  <p className="text-[var(--foreground)]/70 font-medium">Your ID has been verified and deleted from our servers. Enjoy your blue tick!</p>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }

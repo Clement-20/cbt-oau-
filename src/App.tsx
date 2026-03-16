@@ -1,5 +1,6 @@
 import { BrowserRouter as Router, Routes, Route, Link, useLocation } from "react-router-dom";
 import { ThemeProvider, useTheme } from "./components/theme-provider";
+import { getSettings } from "./lib/settings";
 import { HelmetProvider, Helmet } from "react-helmet-async";
 import { useEffect, useState, Suspense, lazy } from "react";
 import { onAuthStateChanged, signInWithPopup, GoogleAuthProvider, signOut, browserPopupRedirectResolver, signInAnonymously } from "firebase/auth";
@@ -11,6 +12,7 @@ import { clsx } from "clsx";
 import NexusBadge from "./components/NexusBadge";
 import Toast from "./components/Toast";
 import { updateNexusStreak } from "./utils/nexusUtils";
+import StudyDeck from "./components/StudyDeck";
 
 // Lazy load pages for code splitting (low bandwidth optimization)
 const Home = lazy(() => import("./pages/Home"));
@@ -24,10 +26,12 @@ const Profile = lazy(() => import("./pages/Profile"));
 const Setup = lazy(() => import("./pages/Setup"));
 const About = lazy(() => import("./pages/About"));
 const Community = lazy(() => import("./pages/Community"));
+const Verification = lazy(() => import("./pages/Verification"));
 
 import { ErrorBoundary } from "./components/ErrorBoundary";
 import LoadingLogo from "./components/LoadingLogo";
 import Tutorial from "./components/Tutorial";
+import FloatingAI from "./components/FloatingAI";
 
 const LoadingFallback = () => (
   <div className="min-h-[60vh] flex flex-col items-center justify-center">
@@ -38,15 +42,34 @@ const LoadingFallback = () => (
 function MainApp() {
   const [user, setUser] = useState<any>(null);
   const [dbUser, setDbUser] = useState<any>(null);
+  const [isPaymentEnabled, setIsPaymentEnabled] = useState(true);
   const [loading, setLoading] = useState(true);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [showTutorial, setShowTutorial] = useState(false);
+  const [showStudyDeck, setShowStudyDeck] = useState(false);
+  const [studyDeckContext, setStudyDeckContext] = useState<string | undefined>();
+  const [studyDeckPrompt, setStudyDeckPrompt] = useState<string | undefined>();
   const { theme, setTheme } = useTheme();
   const location = useLocation();
+  const isAIChatPage = location.pathname === "/validate" || location.pathname === "/cbt";
 
   const [loginError, setLoginError] = useState<string | null>(null);
 
   useEffect(() => {
+    const handleOpenAI = (e: any) => {
+      if (e.detail) {
+        setStudyDeckContext(e.detail.contextText);
+        setStudyDeckPrompt(e.detail.initialPrompt);
+      }
+      setShowStudyDeck(true);
+    };
+    window.addEventListener("open-ai-assistant", handleOpenAI);
+    return () => window.removeEventListener("open-ai-assistant", handleOpenAI);
+  }, []);
+
+  useEffect(() => {
+    getSettings().then(s => setIsPaymentEnabled(s.isPaymentEnabled)).catch(console.error);
+
     const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
       setUser(currentUser);
       if (currentUser) {
@@ -188,16 +211,17 @@ function MainApp() {
     { path: "/validate", label: "Validator" },
     { path: "/leaderboard", label: "Leaderboard" },
     { path: "/community", label: "Community", icon: <Users size={14} /> },
+    ...(isPaymentEnabled ? [{ path: "/verification", label: "Verify Student", icon: <BadgeCheck size={14} /> }] : []),
     { path: "/about", label: "About", icon: <Zap size={14} /> },
   ];
 
   return (
     <div className="min-h-screen bg-[var(--background)] text-[var(--foreground)] font-sans transition-colors duration-300">
       <Helmet>
-        <title>ICEPAB Nexus | OAU Digital Hub</title>
-        <meta name="description" content="The ultimate digital hub for OAU students. Access CBT practice, CGPA calculator, Leaderboard, and more. Built for excellence." />
-        <meta name="keywords" content="OAU, Obafemi Awolowo University, CBT, GST 111, CGPA Calculator, OAU Portal, Digital Nexus, ICEPAB" />
-        <meta property="og:title" content="ICEPAB Nexus | OAU Digital Hub" />
+        <title>ICEPAB Nexus | OAU Digital Hub by Clement IfeOluwa</title>
+        <meta name="description" content="The ultimate digital hub for OAU students by Clement IfeOluwa. Access CBT practice, CGPA calculator, Leaderboard, and more. Built for excellence." />
+        <meta name="keywords" content="OAU, Obafemi Awolowo University, Clement IfeOluwa, Digital Nexus, CBT, GST 111, CGPA Calculator, OAU Portal, ICEPAB" />
+        <meta property="og:title" content="ICEPAB Nexus | OAU Digital Hub by Clement IfeOluwa" />
         <meta property="og:description" content="Empowering OAU students with digital tools for academic success. Practice CBT, track GPA, and stay updated." />
         <meta property="og:type" content="website" />
         <meta property="og:url" content="https://icepab-nexus.run.app/" />
@@ -342,6 +366,7 @@ function MainApp() {
             <Route path="/setup" element={<Setup user={user} dbUser={dbUser} setDbUser={setDbUser} />} />
             <Route path="/about" element={<About />} />
             <Route path="/community" element={<Community user={user} />} />
+            <Route path="/verification" element={<Verification user={user} />} />
           </Routes>
         </Suspense>
       </main>
@@ -356,6 +381,19 @@ function MainApp() {
       </footer>
 
       {showTutorial && <Tutorial onClose={() => setShowTutorial(false)} />}
+      {!isAIChatPage && <FloatingAI />}
+      {showStudyDeck && (
+        <StudyDeck 
+          user={user} 
+          onClose={() => {
+            setShowStudyDeck(false);
+            setStudyDeckContext(undefined);
+            setStudyDeckPrompt(undefined);
+          }} 
+          contextText={studyDeckContext}
+          initialPrompt={studyDeckPrompt}
+        />
+      )}
       <Toast />
     </div>
   );

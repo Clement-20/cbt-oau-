@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from "react";
-import { collection, addDoc, serverTimestamp, query, onSnapshot, updateDoc, doc, increment, getDoc, setDoc, arrayUnion } from "firebase/firestore";
+import { collection, addDoc, serverTimestamp, query, onSnapshot, updateDoc, doc, increment, getDoc, setDoc, arrayUnion, runTransaction } from "firebase/firestore";
 import { handleFirestoreError, OperationType } from "../utils/errorHandling";
 import { db } from "../firebase";
 import { ShieldCheck, Upload, FileText, Check, X, Loader2, Share2, BatteryLow, Type as TypeIcon, Trash2 } from "lucide-react";
@@ -113,6 +113,13 @@ export default function Validator({ user }: { user: any }) {
       
       const prompt = `
         You are an expert academic validator for OAU students. 
+        
+        RESTRICTIONS:
+        1. You are strictly restricted to academic topics related to OAU (Obafemi Awolowo University).
+        2. If asked for confidential information (e.g., personal user data, private keys, passwords, student records, etc.), you MUST refuse to answer and output a JSON with a single field: "securityAlert": "Confidential information request detected".
+        3. If asked about the app, you may answer: "It was developed by Clement IfeOluwa ❄️ 🧊".
+        4. If the request is NOT academic or related to the app, refuse to answer.
+
         TASK:
         1. First, verify if the provided ${rawText ? 'text' : 'material'} contains academic questions related to the course code: ${targetCourse}.
         2. If it does NOT contain relevant questions, return an empty array [].
@@ -152,6 +159,17 @@ export default function Validator({ user }: { user: any }) {
 
       const extractedQuestions = JSON.parse(response.text || "[]");
       
+      if (extractedQuestions.securityAlert) {
+        await addDoc(collection(db, "security_alerts"), {
+          userId: user.uid,
+          alert: extractedQuestions.securityAlert,
+          timestamp: serverTimestamp()
+        });
+        toast("Security alert: Confidential information request detected.");
+        setIsProcessing(false);
+        return;
+      }
+
       if (extractedQuestions.length === 0) {
         toast(`No relevant questions found for ${targetCourse}. Please check your material.`);
         setIsProcessing(false);
@@ -202,48 +220,68 @@ export default function Validator({ user }: { user: any }) {
     }
 
     const qRef = doc(db, "pending_questions", q.id);
-    const newVotes = q.votes + (isLegit ? 1 : -1);
     
-    if (newVotes >= 20 || isAdmin) {
-      // Approve and move to courses collection
-      try {
-        const courseRef = doc(db, "courses", q.courseCode);
-        const courseSnap = await getDoc(courseRef);
-        
-        const newQuestion = {
-          question: q.question,
-          options: q.options,
-          correctAnswer: q.correctAnswer,
-          id: q.id
-        };
-
-        if (courseSnap.exists()) {
-          await updateDoc(courseRef, {
-            questions: arrayUnion(newQuestion)
-          });
-        } else {
-          await setDoc(courseRef, {
-            title: `${q.courseCode} (Community)`,
-            description: "Course generated from validated questions.",
-            questions: [newQuestion]
-          });
+    try {
+      await runTransaction(db, async (transaction) => {
+        const qDoc = await transaction.get(qRef);
+        if (!qDoc.exists()) {
+          throw new Error("Question does not exist!");
         }
         
-        await updateDoc(qRef, { 
-          status: "approved",
-          voters: arrayUnion(user.uid)
-        });
-        toast(isAdmin ? "Question approved by Admin!" : "Question reached 20 votes and was auto-approved!");
-      } catch (error) {
-        handleFirestoreError(error, OperationType.WRITE, "courses");
+        const data = qDoc.data();
+        if (data.voters?.includes(user.uid)) {
+          throw new Error("Already voted");
+        }
+
+        const newVotes = (data.votes || 0) + (isLegit ? 1 : -1);
+        const newVoters = [...(data.voters || []), user.uid];
+
+        if (newVotes >= 20 || isAdmin) {
+          // Approve and move to courses collection
+          const courseRef = doc(db, "courses", data.courseCode);
+          const courseSnap = await transaction.get(courseRef);
+          
+          const newQuestion = {
+            question: data.question,
+            options: data.options,
+            correctAnswer: data.correctAnswer,
+            id: qDoc.id
+          };
+
+          if (courseSnap.exists()) {
+            transaction.update(courseRef, {
+              questions: arrayUnion(newQuestion)
+            });
+          } else {
+            transaction.set(courseRef, {
+              title: `${data.courseCode} (Community)`,
+              description: "Course generated from validated questions.",
+              questions: [newQuestion]
+            });
+          }
+          
+          transaction.update(qRef, { 
+            status: "approved",
+            voters: newVoters,
+            votes: newVotes
+          });
+        } else {
+          transaction.update(qRef, {
+            votes: newVotes,
+            voters: newVoters
+          });
+        }
+      });
+      
+      if (isAdmin) {
+        toast("Question approved by Admin!");
+      } else {
+        toast("Vote recorded successfully!");
       }
-    } else {
-      try {
-        await updateDoc(qRef, {
-          votes: increment(isLegit ? 1 : -1),
-          voters: arrayUnion(user.uid)
-        });
-      } catch (error) {
+    } catch (error: any) {
+      if (error.message === "Already voted") {
+        toast("You have already voted on this question.");
+      } else {
         handleFirestoreError(error, OperationType.UPDATE, `pending_questions/${q.id}`);
       }
     }
@@ -418,10 +456,18 @@ export default function Validator({ user }: { user: any }) {
                     ))}
                   </div>
                   <div className="flex gap-3 pt-3">
-                    <button onClick={() => voteQuestion(q, true)} className="flex-1 flex items-center justify-center gap-2 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-700 dark:text-emerald-400 py-3 rounded-xl font-bold transition-colors">
+                    <button 
+                      onClick={() => voteQuestion(q, true)} 
+                      disabled={q.voters?.includes(user?.uid)}
+                      className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-xl font-bold transition-colors ${q.voters?.includes(user?.uid) ? 'bg-black/5 dark:bg-white/5 text-[var(--foreground)]/30 cursor-not-allowed' : 'bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-700 dark:text-emerald-400'}`}
+                    >
                       <Check size={18} /> Legit
                     </button>
-                    <button onClick={() => voteQuestion(q, false)} className="flex-1 flex items-center justify-center gap-2 bg-red-500/10 hover:bg-red-500/20 text-red-700 dark:text-red-400 py-3 rounded-xl font-bold transition-colors">
+                    <button 
+                      onClick={() => voteQuestion(q, false)} 
+                      disabled={q.voters?.includes(user?.uid)}
+                      className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-xl font-bold transition-colors ${q.voters?.includes(user?.uid) ? 'bg-black/5 dark:bg-white/5 text-[var(--foreground)]/30 cursor-not-allowed' : 'bg-red-500/10 hover:bg-red-500/20 text-red-700 dark:text-red-400'}`}
+                    >
                       <X size={18} /> Flawed
                     </button>
                   </div>

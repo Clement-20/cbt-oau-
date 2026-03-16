@@ -52,7 +52,7 @@ export default function FlashcardEngine() {
             animate={{ rotateY: 0, opacity: 1 }}
             exit={{ rotateY: isFlipped ? 90 : -90, opacity: 0 }}
             transition={{ duration: 0.2 }}
-            className="absolute inset-0 w-full h-full bg-zinc-900/80 border border-zinc-800 rounded-2xl flex items-center justify-center p-6 text-center shadow-xl backdrop-blur-sm"
+            className="absolute inset-0 w-full h-full bg-black/80 dark:bg-black/80 border border-[var(--border)] rounded-2xl flex items-center justify-center p-6 text-center shadow-xl backdrop-blur-sm"
           >
             <p className="text-2xl font-medium text-white">
               {isFlipped ? cards[currentIndex].back : cards[currentIndex].front}

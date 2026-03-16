@@ -6,7 +6,6 @@ import { handleFirestoreError, OperationType } from "../utils/errorHandling";
 import { db } from "../firebase";
 import HostTestModal from "../components/HostTestModal";
 import TestMetricsModal from "../components/TestMetricsModal";
-import StudyDeck from "../components/StudyDeck";
 import Calculator from "../components/Calculator";
 import { Helmet } from "react-helmet-async";
 import { toast } from "../components/Toast";
@@ -48,7 +47,6 @@ export default function CBT({ user }: { user: any }) {
   const [searchQuery, setSearchQuery] = useState("");
   const [searchHostedTestsQuery, setSearchHostedTestsQuery] = useState("");
   const [questionLimit, setQuestionLimit] = useState<number>(10);
-  const [showStudyDeck, setShowStudyDeck] = useState(false);
   const [showCalculator, setShowCalculator] = useState(false);
   const [explanationPrompt, setExplanationPrompt] = useState("");
   const [isLoadingCourses, setIsLoadingCourses] = useState(true);
@@ -454,8 +452,12 @@ export default function CBT({ user }: { user: any }) {
     
     const handleExplain = () => {
       const prompt = `Explain this question and why the correct answer is "${q.options[q.correctAnswer]}":\n\nQuestion: ${q.question}\nOptions: ${q.options.join(", ")}`;
-      setExplanationPrompt(prompt);
-      setShowStudyDeck(true);
+      window.dispatchEvent(new CustomEvent("open-ai-assistant", {
+        detail: {
+          contextText: questions.map(q => q.question).join("\n"),
+          initialPrompt: prompt
+        }
+      }));
     };
 
     return (
@@ -471,7 +473,9 @@ export default function CBT({ user }: { user: any }) {
               <CalcIcon size={18} />
             </button>
             <button 
-              onClick={() => setShowStudyDeck(true)}
+              onClick={() => {
+                window.dispatchEvent(new CustomEvent("open-ai-assistant"));
+              }}
               className="flex items-center gap-2 bg-blue-600/10 text-blue-600 dark:text-blue-400 px-3 py-1.5 rounded-full font-bold text-xs border border-blue-500/20 hover:bg-blue-600/20 transition-colors"
             >
               <Activity size={14} /> Study Deck
@@ -717,18 +721,6 @@ export default function CBT({ user }: { user: any }) {
           testId={metricsTestId} 
           testTitle={metricsTestTitle} 
           onClose={() => setMetricsTestId(null)} 
-        />
-      )}
-
-      {showStudyDeck && (
-        <StudyDeck 
-          user={user} 
-          onClose={() => {
-            setShowStudyDeck(false);
-            setExplanationPrompt("");
-          }} 
-          contextText={questions.map(q => q.question).join("\n")}
-          initialPrompt={explanationPrompt}
         />
       )}
 
