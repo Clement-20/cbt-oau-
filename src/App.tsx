@@ -47,6 +47,7 @@ function MainApp() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [showTutorial, setShowTutorial] = useState(false);
   const [showStudyDeck, setShowStudyDeck] = useState(false);
+  const [isFocusMode, setIsFocusMode] = useState(false);
   const [studyDeckContext, setStudyDeckContext] = useState<string | undefined>();
   const [studyDeckPrompt, setStudyDeckPrompt] = useState<string | undefined>();
   const { theme, setTheme } = useTheme();
@@ -219,17 +220,21 @@ function MainApp() {
     <div className="min-h-screen bg-[var(--background)] text-[var(--foreground)] font-sans transition-colors duration-300">
       <Helmet>
         <title>ICEPAB Nexus | OAU Digital Hub by Clement IfeOluwa</title>
-        <meta name="description" content="The ultimate digital hub for OAU students by Clement IfeOluwa. Access CBT practice, CGPA calculator, Leaderboard, and more. Built for excellence." />
-        <meta name="keywords" content="OAU, Obafemi Awolowo University, Clement IfeOluwa, Digital Nexus, CBT, GST 111, CGPA Calculator, OAU Portal, ICEPAB" />
+        <meta name="description" content="The ultimate OAU student super-app by Clement IfeOluwa. Practice OAU CBT GST 111, use the OAU CGPA Calculator, and read the OAU Freshers Guide. Built for Great Ife." />
+        <meta name="keywords" content="OAU CBT GST 111, OAU CGPA Calculator, OAU Freshers Guide, Obafemi Awolowo University, Clement IfeOluwa, Digital Nexus, CBT, GST 111, OAU Portal, ICEPAB" />
         <meta property="og:title" content="ICEPAB Nexus | OAU Digital Hub by Clement IfeOluwa" />
-        <meta property="og:description" content="Empowering OAU students with digital tools for academic success. Practice CBT, track GPA, and stay updated." />
+        <meta property="og:description" content="The ultimate OAU student super-app. Practice OAU CBT GST 111, use the OAU CGPA Calculator, and read the OAU Freshers Guide." />
         <meta property="og:type" content="website" />
-        <meta property="og:url" content="https://icepab-nexus.run.app/" />
-        <meta property="og:image" content="https://icepab-nexus.run.app/og-image.png" />
+        <meta property="og:url" content={`${import.meta.env.NEXT_PUBLIC_BASE_URL || 'https://icepab-nexus.run.app'}${location.pathname}`} />
+        <meta property="og:image" content={`${import.meta.env.NEXT_PUBLIC_BASE_URL || 'https://icepab-nexus.run.app'}/og-image.png`} />
+        <link rel="canonical" href={`${import.meta.env.NEXT_PUBLIC_BASE_URL || 'https://icepab-nexus.run.app'}${location.pathname}${location.search}`} />
         <meta name="twitter:card" content="summary_large_image" />
         <meta name="theme-color" content="#2563eb" />
       </Helmet>
-      <nav className="border-b border-[var(--border)] p-4 sticky top-0 bg-[var(--background)]/80 backdrop-blur-xl z-50 shadow-sm">
+      <nav className={clsx(
+        "border-b border-[var(--border)] p-4 sticky top-0 bg-[var(--background)]/80 backdrop-blur-xl z-50 shadow-sm transition-transform duration-500",
+        isFocusMode && location.pathname === "/cbt" && "-translate-y-full"
+      )}>
         <div className="max-w-7xl mx-auto flex justify-between items-center">
           <div className="flex items-center gap-8">
             <Link to="/" className="text-xl font-bold tracking-tighter flex items-center gap-2">
@@ -357,7 +362,7 @@ function MainApp() {
           <Routes>
             <Route path="/" element={<Home user={user} />} />
             <Route path="/icepab-admin" element={<Admin user={user} />} />
-            <Route path="/cbt" element={<CBT user={user} />} />
+            <Route path="/cbt" element={<CBT user={user} isFocusMode={isFocusMode} setIsFocusMode={setIsFocusMode} />} />
             <Route path="/validate" element={<Validator user={user} />} />
             <Route path="/leaderboard" element={<Leaderboard user={user} />} />
             <Route path="/gpa" element={<GPA user={user} />} />
@@ -402,6 +407,15 @@ function MainApp() {
 export default function App() {
   return (
     <HelmetProvider>
+      <Helmet>
+        <title>Digital Nexus | OAU CBT Practice & Campus Hub</title>
+        <meta name="description" content="The ultimate OAU student super-app. Practice OAU CBT GST 111, use the OAU CGPA Calculator, and read the OAU Freshers Guide. Built for Great Ife." />
+        <meta name="keywords" content="OAU CBT GST 111, OAU CGPA Calculator, OAU Freshers Guide, Obafemi Awolowo University, Clement IfeOluwa, Digital Nexus, CBT, GST 111, OAU Portal, ICEPAB" />
+        <meta property="og:title" content="Digital Nexus | OAU CBT Practice & Campus Hub" />
+        <meta property="og:description" content="The ultimate OAU student super-app. Practice OAU CBT GST 111, use the OAU CGPA Calculator, and read the OAU Freshers Guide." />
+        <meta property="og:type" content="website" />
+        <meta property="og:url" content="https://ais-dev-qjlk7xgfxv634pefbo7mjw-622545485148.europe-west2.run.app" />
+      </Helmet>
       <ThemeProvider defaultTheme="dark" storageKey="vite-ui-theme">
         <Router>
           <ErrorBoundary>

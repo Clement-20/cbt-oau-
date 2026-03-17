@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { collection, query, where, getDocs, doc, updateDoc } from "firebase/firestore";
 import { handleFirestoreError, OperationType } from "../utils/errorHandling";
-import { db } from "../firebase";
+import { db, auth } from "../firebase";
 import { X, Trophy, Clock, Trash2, AlertTriangle } from "lucide-react";
 import { toast } from "./Toast";
 
@@ -30,7 +30,14 @@ export default function TestMetricsModal({ testId, testTitle, onClose }: TestMet
   useEffect(() => {
     const fetchResults = async () => {
       try {
-        const q = query(collection(db, "test_results"), where("testId", "==", testId));
+        const user = auth.currentUser;
+        if (!user) return;
+        
+        const q = query(
+          collection(db, "test_results"), 
+          where("testId", "==", testId),
+          where("hostId", "==", user.uid)
+        );
         const snapshot = await getDocs(q);
         const fetchedResults: TestResult[] = [];
         snapshot.forEach((doc) => {

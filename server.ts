@@ -3,10 +3,12 @@ import { createServer as createViteServer } from "vite";
 import path from "path";
 import compression from "compression";
 import axios from "axios";
+import { courses } from "./src/lib/questions";
 
 async function startServer() {
   const app = express();
   const PORT = 3000;
+  const BASE_URL = process.env.NEXT_PUBLIC_BASE_URL || "https://icepab-nexus.run.app";
 
   app.use(compression());
   app.use(express.json());
@@ -48,21 +50,42 @@ async function startServer() {
   // SEO: robots.txt
   app.get("/robots.txt", (req, res) => {
     res.type("text/plain");
-    res.send("User-agent: *\nAllow: /\nDisallow: /icepab-admin\nSitemap: https://icepab-nexus.run.app/sitemap.xml");
+    res.send(`User-agent: *
+Allow: /
+Disallow: /icepab-admin
+Sitemap: ${BASE_URL}/sitemap.xml`);
   });
 
   // SEO: sitemap.xml
   app.get("/sitemap.xml", (req, res) => {
     res.type("application/xml");
-    res.send(`<?xml version="1.0" encoding="UTF-8"?>
+    
+    const staticPages = [
+      "",
+      "/cbt",
+      "/validate",
+      "/leaderboard",
+      "/community",
+      "/about"
+    ];
+
+    const coursePages = courses.map(course => `/cbt?course=${encodeURIComponent(course.code)}`);
+
+    const sitemap = `<?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
-  <url><loc>https://icepab-nexus.run.app/</loc><priority>1.0</priority></url>
-  <url><loc>https://icepab-nexus.run.app/cbt</loc><priority>0.8</priority></url>
-  <url><loc>https://icepab-nexus.run.app/validate</loc><priority>0.7</priority></url>
-  <url><loc>https://icepab-nexus.run.app/leaderboard</loc><priority>0.6</priority></url>
-  <url><loc>https://icepab-nexus.run.app/community</loc><priority>0.5</priority></url>
-  <url><loc>https://icepab-nexus.run.app/about</loc><priority>0.4</priority></url>
-</urlset>`);
+  ${staticPages.map(page => `
+  <url>
+    <loc>${BASE_URL}${page}</loc>
+    <priority>${page === "" ? "1.0" : "0.8"}</priority>
+  </url>`).join("")}
+  ${coursePages.map(page => `
+  <url>
+    <loc>${BASE_URL}${page}</loc>
+    <priority>0.7</priority>
+  </url>`).join("")}
+</urlset>`;
+
+    res.send(sitemap);
   });
 
   // Vite middleware for development

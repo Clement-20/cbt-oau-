@@ -98,8 +98,25 @@ export default function Home({ user }: { user: any }) {
   return (
     <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="space-y-8">
       <Helmet>
-        <title>Home | ICEPAB Nexus</title>
-        <meta name="description" content="Welcome to ICEPAB Nexus. Access CBT practice, CGPA calculator, and OAU student resources." />
+        <title>Home | ICEPAB Nexus - OAU Student Super-App</title>
+        <meta name="description" content="Welcome to ICEPAB Nexus, the ultimate OAU student super-app. Practice OAU CBT GST 111, use the OAU CGPA Calculator, and access OAU student resources." />
+        <meta name="keywords" content="OAU CBT GST 111, OAU CGPA Calculator, OAU Freshers Guide, Obafemi Awolowo University, ICEPAB, OAU student portal, OAU E-Portal, Great Ife, OAU Nexus" />
+        <script type="application/ld+json">
+          {`
+            {
+              "@context": "https://schema.org",
+              "@type": "WebSite",
+              "name": "ICEPAB Nexus",
+              "url": "${import.meta.env.NEXT_PUBLIC_BASE_URL || 'https://icepab-nexus.run.app'}",
+              "description": "The ultimate OAU student super-app. Practice OAU CBT GST 111, use the OAU CGPA Calculator, and read the OAU Freshers Guide.",
+              "potentialAction": {
+                "@type": "SearchAction",
+                "target": "${import.meta.env.NEXT_PUBLIC_BASE_URL || 'https://icepab-nexus.run.app'}/cbt?q={search_term_string}",
+                "query-input": "required name=search_term_string"
+              }
+            }
+          `}
+        </script>
       </Helmet>
       {user?.isAnonymous && showGuestWarning && (
         <div className="bg-orange-500/10 border border-orange-500/30 text-orange-700 dark:text-orange-300 p-4 rounded-xl flex items-start gap-3 shadow-sm relative pr-10">

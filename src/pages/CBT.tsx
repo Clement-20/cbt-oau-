@@ -4,6 +4,7 @@ import { BookOpen, Play, CheckCircle2, XCircle, Flame, Users, Plus, Activity } f
 import { doc, updateDoc, increment, collection, getDocs, getDoc, onSnapshot, query, where, addDoc } from "firebase/firestore";
 import { handleFirestoreError, OperationType } from "../utils/errorHandling";
 import { db } from "../firebase";
+import { clsx } from "clsx";
 import HostTestModal from "../components/HostTestModal";
 import TestMetricsModal from "../components/TestMetricsModal";
 import Calculator from "../components/Calculator";
@@ -25,7 +26,7 @@ interface HostedTest {
   duration?: number;
 }
 
-export default function CBT({ user }: { user: any }) {
+export default function CBT({ user, isFocusMode, setIsFocusMode }: { user: any, isFocusMode?: boolean, setIsFocusMode?: (val: boolean) => void }) {
   const [selectedCourse, setSelectedCourse] = useState<string | null>(null);
   const [questions, setQuestions] = useState<Question[]>([]);
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
@@ -42,6 +43,7 @@ export default function CBT({ user }: { user: any }) {
   const [hostedTests, setHostedTests] = useState<HostedTest[]>([]);
   const [showHostModal, setShowHostModal] = useState(false);
   const [currentHostedTestId, setCurrentHostedTestId] = useState<string | null>(null);
+  const [currentHostId, setCurrentHostId] = useState<string | null>(null);
   const [metricsTestId, setMetricsTestId] = useState<string | null>(null);
   const [metricsTestTitle, setMetricsTestTitle] = useState<string>("");
   const [searchQuery, setSearchQuery] = useState("");
@@ -193,6 +195,7 @@ export default function CBT({ user }: { user: any }) {
       }
       setQuestions(hostedTest.questions);
       setCurrentHostedTestId(hostedTest.id);
+      setCurrentHostId(hostedTest.hostId);
       if (hostedTest.duration) {
         setTimeLeft(hostedTest.duration * 60);
       } else {
@@ -206,6 +209,7 @@ export default function CBT({ user }: { user: any }) {
       const randomQs = [...course.questions].sort(() => 0.5 - Math.random()).slice(0, count);
       setQuestions(randomQs);
       setCurrentHostedTestId(null);
+      setCurrentHostId(null);
       setTimeLeft(count * 60);
     }
     
@@ -244,6 +248,7 @@ export default function CBT({ user }: { user: any }) {
         if (currentHostedTestId) {
           await addDoc(collection(db, "test_results"), {
             testId: currentHostedTestId,
+            hostId: currentHostId,
             userId: user.uid,
             userName: user.displayName || "Anonymous",
             score: finalScore,
@@ -277,7 +282,8 @@ export default function CBT({ user }: { user: any }) {
             await addDoc(collection(db, "broadcasts"), {
               message: `🏆 ${user.displayName || 'A student'} just scored ${finalScore}/${questions.length} in ${selectedCourse}!`,
               timestamp: new Date(),
-              type: "achievement"
+              type: "achievement",
+              authorId: user.uid
             });
           }
 
@@ -557,6 +563,29 @@ export default function CBT({ user }: { user: any }) {
       <Helmet>
         <title>CBT Engine | ICEPAB Nexus</title>
         <meta name="description" content="Practice exams for GST 111, BUS 101, SOC 101, and AMS 103 on the ICEPAB Nexus CBT Engine." />
+        <script type="application/ld+json">
+          {`
+            {
+              "@context": "https://schema.org",
+              "@type": "ItemList",
+              "itemListElement": ${JSON.stringify(allCourses.map((course, index) => ({
+                "@type": "ListItem",
+                "position": index + 1,
+                "item": {
+                  "@type": "Course",
+                  "name": course.title,
+                  "description": course.description,
+                  "provider": {
+                    "@type": "Organization",
+                    "name": "ICEPAB Nexus",
+                    "sameAs": "${import.meta.env.NEXT_PUBLIC_BASE_URL || 'https://icepab-nexus.run.app'}"
+                  },
+                  "courseCode": course.code
+                }
+              })))}
+            }
+          `}
+        </script>
       </Helmet>
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
@@ -565,18 +594,35 @@ export default function CBT({ user }: { user: any }) {
           </h1>
           <p className="text-[var(--foreground)]/60 mt-2 font-medium">Practice exams for GST 111, BUS 101, SOC 101, and AMS 103.</p>
         </div>
-        
-        {isVerified && (
-          <button 
-            onClick={() => setShowHostModal(true)}
-            className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-5 py-3 rounded-xl font-bold transition-colors shadow-md shrink-0"
-          >
-            <Plus size={20} /> Host a Test
-          </button>
-        )}
+
+        <div className="flex items-center gap-4">
+          {setIsFocusMode && (
+            <button 
+              onClick={() => setIsFocusMode(!isFocusMode)}
+              className={clsx(
+                "flex items-center gap-2 px-4 py-2 rounded-xl font-bold transition-all border",
+                isFocusMode 
+                  ? "bg-orange-500 text-white border-orange-400 shadow-[0_0_15px_rgba(249,115,22,0.4)]" 
+                  : "bg-black/5 dark:bg-white/5 text-[var(--foreground)]/60 border-[var(--border)] hover:bg-black/10 dark:hover:bg-white/10"
+              )}
+            >
+              <Flame size={18} className={isFocusMode ? "animate-pulse" : ""} />
+              {isFocusMode ? "Focus Mode ON" : "Focus Mode"}
+            </button>
+          )}
+          
+          {isVerified && !isFocusMode && (
+            <button 
+              onClick={() => setShowHostModal(true)}
+              className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-5 py-3 rounded-xl font-bold transition-colors shadow-md shrink-0"
+            >
+              <Plus size={20} /> Host a Test
+            </button>
+          )}
+        </div>
       </div>
 
-      {hostedTests.length > 0 || isLoadingTests ? (
+      {!isFocusMode && (hostedTests.length > 0 || isLoadingTests) ? (
         <div className="mb-8">
           <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-4">
             <h2 className="text-xl font-bold flex items-center gap-2">

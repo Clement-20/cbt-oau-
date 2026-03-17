@@ -1,25 +1,50 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
+    // ===============================================================
     // Helper Functions
-    function isAuthenticated() {
-      return request.auth != null;
-    }
-    
-    function isOwner(userId) {
-      return isAuthenticated() && request.auth.uid == userId;
-    }
-    
+    // ===============================================================
+    function isAuthenticated() { return request.auth != null; }
+    function isOwner(userId) { return isAuthenticated() && request.auth.uid == userId; }
     function isAdmin() {
+      let userDoc = get(/databases/$(database)/documents/users/$(request.auth.uid));
       return isAuthenticated() && (
-        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin' ||
+        (userDoc.data != null && userDoc.data.role == 'admin') ||
         (request.auth.token.email == "banmekeifeoluwa@gmail.com" && request.auth.token.email_verified == true)
       );
+    }
+    function hasRequiredFields(fields) { return request.resource.data.keys().hasAll(fields); }
+    function hasOnlyAllowedFields(fields) { return request.resource.data.keys().hasOnly(fields); }
+    function uidUnchanged() { return !('uid' in request.resource.data) || request.resource.data.uid == request.auth.uid; }
+    function uidNotModified() { return !('uid' in request.resource.data) || request.resource.data.uid == resource.data.uid; }
+    function isValidString(field, minLen, maxLen) {
+      return request.resource.data[field] is string && request.resource.data[field].size() >= minLen && request.resource.data[field].size() <= maxLen;
+    }
+    function isValidEmail(email) { return email is string && email.matches("^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$"); }
+    function isValidUrl(url) { return url is string && (url.matches("^https://.*") || url.matches("^http://.*")); }
+    function isNonNegative(field) { return request.resource.data[field] is number && request.resource.data[field] >= 0; }
+    function isValidList(list, maxSize) { return list is list && list.size() <= maxSize; }
+    function isValidMap(mapData, allowedKeys) { return mapData is map && mapData.keys().hasOnly(allowedKeys); }
+    function areImmutableFieldsUnchanged(fields) { return !request.resource.data.diff(resource.data).affectedKeys().hasAny(fields); }
+
+    // ===============================================================
+    // Collections
+    // ===============================================================
+    match /settings/{settingId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    match /courses/{courseId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated() && hasRequiredFields(['title', 'questions']) && hasOnlyAllowedFields(['title', 'questions', 'description']);
+      allow update: if isAuthenticated() && hasOnlyAllowedFields(['title', 'questions', 'description']);
+      allow delete: if isAdmin();
     }
 
     match /users/{userId} {
       allow read: if isAuthenticated();
-      allow create: if isOwner(userId) && request.resource.data.role == 'student';
+      allow create: if isOwner(userId) && hasRequiredFields(['role']) && (request.resource.data.role == 'student' || request.resource.data.role == 'guest');
       allow update: if isOwner(userId) || isAdmin();
       
       match /private/{document=**} {
@@ -29,49 +54,67 @@ service cloud.firestore {
 
     match /broadcasts/{broadcastId} {
       allow read: if isAuthenticated();
-      allow create: if isAdmin();
+      allow create: if isAdmin() || (isAuthenticated() && request.resource.data.type == 'achievement' && hasRequiredFields(['message', 'timestamp', 'type']));
       allow update, delete: if isAdmin();
     }
 
     match /pending_questions/{questionId} {
       allow read: if isAuthenticated();
-      allow create: if isAuthenticated();
-      allow update: if isAuthenticated() && request.resource.data.diff(resource.data).affectedKeys().hasAny(['votes', 'status']);
-      allow delete: if isAdmin();
+      allow create: if isAuthenticated() && hasRequiredFields(['courseCode', 'question', 'options', 'correctAnswer', 'authorId', 'status', 'votes', 'voters', 'timestamp']) && isValidString('question', 1, 1000) && isValidList(request.resource.data.options, 10) && hasOnlyAllowedFields(['courseCode', 'question', 'options', 'correctAnswer', 'authorId', 'status', 'votes', 'voters', 'timestamp']);
+      allow update: if isAuthenticated() && areImmutableFieldsUnchanged(['timestamp', 'authorId']) && hasOnlyAllowedFields(['courseCode', 'question', 'options', 'correctAnswer', 'authorId', 'status', 'votes', 'voters', 'timestamp']);
+      allow delete: if isAuthenticated();
     }
-    
-    match /courses/{courseId} {
-      allow read: if isAuthenticated();
-      allow create: if isAuthenticated();
-      allow update: if isAuthenticated();
-      allow delete: if isAdmin();
-    }
-    
+
     match /hosted_tests/{testId} {
       allow read: if isAuthenticated();
-      allow create: if isAuthenticated() && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.isVerified == true;
-      allow update: if isAuthenticated() && request.auth.uid == resource.data.hostId;
+      allow create: if isAuthenticated() && hasRequiredFields(['title', 'courseCode', 'hostId', 'hostName', 'questions', 'createdAt', 'expiresAt', 'status']) && request.resource.data.hostId == request.auth.uid && hasOnlyAllowedFields(['title', 'courseCode', 'hostId', 'hostName', 'questions', 'createdAt', 'expiresAt', 'status', 'maxAttempts', 'duration']);
+      allow update: if isAuthenticated() && request.auth.uid == resource.data.hostId && areImmutableFieldsUnchanged(['hostId', 'createdAt']);
       allow delete: if isAdmin() || (isAuthenticated() && request.auth.uid == resource.data.hostId);
     }
 
     match /test_results/{resultId} {
+      allow read: if isAuthenticated() && (
+        request.auth.uid == resource.data.userId || 
+        isAdmin() || 
+        resource.data.hostId == request.auth.uid
+      );
+      allow create: if isAuthenticated() && hasRequiredFields(['userId', 'testId', 'score', 'hostId']) && isNonNegative('score') && hasOnlyAllowedFields(['userId', 'testId', 'hostId', 'score', 'timestamp', 'userName', 'totalQuestions']);
+      allow update: if false;
+      allow delete: if isAdmin();
+    }
+
+    match /community_reviews/{reviewId} {
       allow read: if isAuthenticated();
-      allow create: if isAuthenticated();
-      allow update: if false; // Results shouldn't be updated
+      allow create: if isAuthenticated() && hasRequiredFields(['userId', 'text', 'rating']) && isValidString('text', 1, 1000) && isNonNegative('rating') && hasOnlyAllowedFields(['userId', 'userName', 'userPhoto', 'text', 'rating', 'timestamp']);
+      allow update, delete: if isAdmin() || (isAuthenticated() && request.auth.uid == resource.data.userId);
+    }
+
+    match /flex_store_listings/{listingId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated() && hasRequiredFields(['itemName', 'price', 'whatsappNumber', 'imageUrl', 'vendorUid']) && isValidString('itemName', 1, 100) && isNonNegative('price') && hasOnlyAllowedFields(['itemName', 'category', 'price', 'whatsappNumber', 'imageUrl', 'vendorName', 'vendorUid', 'createdAt']);
+      allow update: if isAuthenticated() && request.auth.uid == resource.data.vendorUid && areImmutableFieldsUnchanged(['vendorUid', 'createdAt']);
+      allow delete: if isAdmin() || (isAuthenticated() && request.auth.uid == resource.data.vendorUid);
+    }
+
+    match /payment_verifications/{verificationId} {
+      allow read: if isAuthenticated() && (request.auth.uid == resource.data.userId || isAdmin());
+      allow create: if isAuthenticated() && hasRequiredFields(['userId', 'reference', 'status']) && hasOnlyAllowedFields(['userId', 'userEmail', 'userName', 'reference', 'status', 'timestamp']);
+      allow update: if isAdmin();
       allow delete: if isAdmin();
     }
 
     match /resources/{resourceId} {
       allow read: if isAuthenticated();
-      allow create: if isAuthenticated();
+      allow create: if isAuthenticated() && hasRequiredFields(['userId', 'url', 'title', 'type', 'course']) && isValidUrl('url') && hasOnlyAllowedFields(['title', 'type', 'url', 'course', 'uploadedBy', 'userId', 'fileHash', 'timestamp']);
       allow update: if isAdmin() || (isAuthenticated() && request.auth.uid == resource.data.userId);
       allow delete: if isAdmin() || (isAuthenticated() && request.auth.uid == resource.data.userId);
     }
 
-    match /community_reviews/{reviewId} {
-      allow read: if isAuthenticated();
+    match /security_alerts/{alertId} {
+      allow read: if isAdmin();
       allow create: if isAuthenticated();
-      allow update, delete: if isAdmin() || (isAuthenticated() && request.auth.uid == resource.data.userId);
+      allow update: if isAdmin();
+      allow delete: if isAdmin();
     }
   }
 }
