@@ -194,6 +194,8 @@ export default function Validator({ user }: { user: any }) {
           options: q.options,
           correctAnswer: q.correctAnswer,
           authorId: user.uid,
+          authorEmail: user.email,
+          authorName: user.displayName,
           votes: 0,
           voters: [],
           status: "pending",

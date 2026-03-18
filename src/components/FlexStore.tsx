@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { collection, query, orderBy, onSnapshot, getDocs, doc, getDoc } from "firebase/firestore";
+import { collection, query, orderBy, onSnapshot, getDocs, doc, getDoc, limit } from "firebase/firestore";
 import { db } from "../firebase";
 import { BadgeCheck, ShoppingBag, Plus, MessageCircle, Search } from "lucide-react";
 import AddHustleModal from "./AddHustleModal";
@@ -27,7 +27,7 @@ export default function FlexStore({ user }: { user: any }) {
   const [searchQuery, setSearchQuery] = useState("");
 
   useEffect(() => {
-    const q = query(collection(db, "flex_store_listings"), orderBy("createdAt", "desc"));
+    const q = query(collection(db, "flex_store_listings"), orderBy("createdAt", "desc"), limit(60));
     const unsubscribe = onSnapshot(q, async (snapshot) => {
       const fetchedListings: Listing[] = [];
       const vendorUids = new Set<string>();

@@ -1,4 +1,4 @@
-import { doc, getDoc, updateDoc } from "firebase/firestore";
+import { doc, getDoc, setDoc, onSnapshot } from "firebase/firestore";
 import { db } from "../firebase";
 
 export const getSettings = async () => {
@@ -10,7 +10,18 @@ export const getSettings = async () => {
   return { isPaymentEnabled: true };
 };
 
+export const subscribeToSettings = (callback: (settings: any) => void) => {
+  const settingsRef = doc(db, "settings", "global");
+  return onSnapshot(settingsRef, (doc) => {
+    if (doc.exists()) {
+      callback(doc.data());
+    } else {
+      callback({ isPaymentEnabled: true });
+    }
+  });
+};
+
 export const updateSettings = async (settings: { isPaymentEnabled: boolean }) => {
   const settingsRef = doc(db, "settings", "global");
-  await updateDoc(settingsRef, settings);
+  await setDoc(settingsRef, settings, { merge: true });
 };

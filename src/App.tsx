@@ -1,6 +1,6 @@
 import { BrowserRouter as Router, Routes, Route, Link, useLocation } from "react-router-dom";
 import { ThemeProvider, useTheme } from "./components/theme-provider";
-import { getSettings } from "./lib/settings";
+import { getSettings, subscribeToSettings } from "./lib/settings";
 import { HelmetProvider, Helmet } from "react-helmet-async";
 import { useEffect, useState, Suspense, lazy } from "react";
 import { onAuthStateChanged, signInWithPopup, GoogleAuthProvider, signOut, browserPopupRedirectResolver, signInAnonymously } from "firebase/auth";
@@ -69,9 +69,11 @@ function MainApp() {
   }, []);
 
   useEffect(() => {
-    getSettings().then(s => setIsPaymentEnabled(s.isPaymentEnabled)).catch(console.error);
+    const unsubscribeSettings = subscribeToSettings((s) => {
+      setIsPaymentEnabled(s.isPaymentEnabled);
+    });
 
-    const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
+    const unsubscribeAuth = onAuthStateChanged(auth, async (currentUser) => {
       setUser(currentUser);
       if (currentUser) {
         try {
@@ -98,7 +100,7 @@ function MainApp() {
               createdAt: new Date().toISOString()
             } : {
               uid: currentUser.uid,
-              email: currentUser.email,
+              email: currentUser.email?.trim().toLowerCase(),
               displayName: currentUser.displayName,
               photoURL: currentUser.photoURL,
               role: "student",
@@ -126,6 +128,12 @@ function MainApp() {
             }
             const now = Date.now();
             const shanaPeriodStart = userData.shanaPeriodStart || now;
+            
+            // Normalize email for existing users if not already normalized
+            if (userData.email && userData.email !== userData.email.trim().toLowerCase()) {
+              await updateDoc(userRef, { email: userData.email.trim().toLowerCase() });
+              userData.email = userData.email.trim().toLowerCase();
+            }
             
             if (now - shanaPeriodStart > 14 * 24 * 60 * 60 * 1000) {
               // Reset Shana stats every 2 weeks
@@ -164,7 +172,10 @@ function MainApp() {
         setLoading(false);
       }
     });
-    return () => unsubscribe();
+    return () => {
+      unsubscribeSettings();
+      unsubscribeAuth();
+    };
   }, []);
 
   const login = async () => {
@@ -229,7 +240,10 @@ function MainApp() {
         <meta property="og:image" content={`${import.meta.env.NEXT_PUBLIC_BASE_URL || 'https://icepab-nexus.run.app'}/og-image.png`} />
         <link rel="canonical" href={`${import.meta.env.NEXT_PUBLIC_BASE_URL || 'https://icepab-nexus.run.app'}${location.pathname}${location.search}`} />
         <meta name="twitter:card" content="summary_large_image" />
+        <meta name="twitter:title" content="ICEPAB Nexus | OAU Digital Hub" />
+        <meta name="twitter:description" content="The ultimate OAU student super-app. Practice OAU CBT GST 111, use the OAU CGPA Calculator, and read the OAU Freshers Guide." />
         <meta name="theme-color" content="#2563eb" />
+        <meta name="robots" content="index, follow" />
       </Helmet>
       <nav className={clsx(
         "border-b border-[var(--border)] p-4 sticky top-0 bg-[var(--background)]/80 backdrop-blur-xl z-50 shadow-sm transition-transform duration-500",
@@ -407,15 +421,6 @@ function MainApp() {
 export default function App() {
   return (
     <HelmetProvider>
-      <Helmet>
-        <title>Digital Nexus | OAU CBT Practice & Campus Hub</title>
-        <meta name="description" content="The ultimate OAU student super-app. Practice OAU CBT GST 111, use the OAU CGPA Calculator, and read the OAU Freshers Guide. Built for Great Ife." />
-        <meta name="keywords" content="OAU CBT GST 111, OAU CGPA Calculator, OAU Freshers Guide, Obafemi Awolowo University, Clement IfeOluwa, Digital Nexus, CBT, GST 111, OAU Portal, ICEPAB" />
-        <meta property="og:title" content="Digital Nexus | OAU CBT Practice & Campus Hub" />
-        <meta property="og:description" content="The ultimate OAU student super-app. Practice OAU CBT GST 111, use the OAU CGPA Calculator, and read the OAU Freshers Guide." />
-        <meta property="og:type" content="website" />
-        <meta property="og:url" content="https://ais-dev-qjlk7xgfxv634pefbo7mjw-622545485148.europe-west2.run.app" />
-      </Helmet>
       <ThemeProvider defaultTheme="dark" storageKey="vite-ui-theme">
         <Router>
           <ErrorBoundary>

@@ -1,8 +1,9 @@
 import React, { useState } from 'react';
 import { db } from '../firebase';
-import { collection, addDoc } from 'firebase/firestore';
+import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
 import { X, Upload, Loader2 } from 'lucide-react';
 import { toast } from './Toast';
+import { handleFirestoreError, OperationType } from '../utils/errorHandling';
 
 export default function AddHustleModal({ user, onClose }: { user: any, onClose: () => void }) {
   const [itemName, setItemName] = useState('');
@@ -49,13 +50,14 @@ export default function AddHustleModal({ user, onClose }: { user: any, onClose: 
         imageUrl,
         vendorName: user.displayName || 'Anonymous',
         vendorUid: user.uid,
-        createdAt: Date.now()
+        createdAt: serverTimestamp()
       });
       
       toast("Hustle added successfully! 🚀");
       onClose();
     } catch (error) {
       console.error("Error adding hustle:", error);
+      handleFirestoreError(error, OperationType.CREATE, 'flex_store_listings');
       toast("Failed to add hustle. Please try again.");
     } finally {
       setIsUploading(false);
@@ -82,6 +84,7 @@ export default function AddHustleModal({ user, onClose }: { user: any, onClose: 
             <label className="text-xs font-bold uppercase tracking-wider text-[var(--foreground)]/50 ml-1">Item Name</label>
             <input 
               required
+              value={itemName}
               placeholder="e.g. iPhone 13 Pro Max" 
               className="w-full p-3 rounded-xl bg-black/5 dark:bg-white/5 border border-[var(--border)] focus:ring-2 focus:ring-blue-500 outline-none" 
               onChange={e => setItemName(e.target.value)} 
@@ -92,6 +95,7 @@ export default function AddHustleModal({ user, onClose }: { user: any, onClose: 
             <div className="space-y-1.5">
               <label className="text-xs font-bold uppercase tracking-wider text-[var(--foreground)]/50 ml-1">Category</label>
               <select 
+                value={category}
                 className="w-full p-3 rounded-xl bg-black/5 dark:bg-white/5 border border-[var(--border)] focus:ring-2 focus:ring-blue-500 outline-none" 
                 onChange={e => setCategory(e.target.value)}
               >
@@ -107,6 +111,7 @@ export default function AddHustleModal({ user, onClose }: { user: any, onClose: 
               <input 
                 required
                 type="number" 
+                value={price}
                 placeholder="5000" 
                 className="w-full p-3 rounded-xl bg-black/5 dark:bg-white/5 border border-[var(--border)] focus:ring-2 focus:ring-blue-500 outline-none" 
                 onChange={e => setPrice(e.target.value)} 
@@ -119,6 +124,7 @@ export default function AddHustleModal({ user, onClose }: { user: any, onClose: 
               <label className="text-xs font-bold uppercase tracking-wider text-[var(--foreground)]/50 ml-1">WhatsApp Number</label>
               <input 
                 required
+                value={whatsappNumber}
                 placeholder="+2348123456789" 
                 className="w-full p-3 rounded-xl bg-black/5 dark:bg-white/5 border border-[var(--border)] focus:ring-2 focus:ring-blue-500 outline-none" 
                 onChange={e => setWhatsappNumber(e.target.value)} 
@@ -127,6 +133,7 @@ export default function AddHustleModal({ user, onClose }: { user: any, onClose: 
             <div className="space-y-1.5">
               <label className="text-xs font-bold uppercase tracking-wider text-[var(--foreground)]/50 ml-1">Location</label>
               <select 
+                value={location}
                 className="w-full p-3 rounded-xl bg-black/5 dark:bg-white/5 border border-[var(--border)] focus:ring-2 focus:ring-blue-500 outline-none" 
                 onChange={e => setLocation(e.target.value)}
               >
@@ -169,6 +176,7 @@ export default function AddHustleModal({ user, onClose }: { user: any, onClose: 
           </div>
 
           <button 
+            type="submit"
             disabled={isUploading}
             className="w-full bg-blue-600 hover:bg-blue-700 disabled:bg-blue-600/50 text-white p-4 rounded-2xl font-bold transition-all shadow-lg flex items-center justify-center gap-2 mt-4"
           >

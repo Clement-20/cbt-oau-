@@ -1,14 +1,24 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { Helmet } from "react-helmet-async";
 import { collection, addDoc, serverTimestamp } from "firebase/firestore";
 import { db } from "../firebase";
 import { toast } from "../components/Toast";
-import { Loader2, CreditCard, Copy, Check } from "lucide-react";
+import { Loader2, CreditCard, Copy, Check, ShieldAlert } from "lucide-react";
+import { getSettings } from "../lib/settings";
 
 export default function Verification({ user }: { user: any }) {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [reference, setReference] = useState("");
   const [copied, setCopied] = useState(false);
+  const [isPaymentEnabled, setIsPaymentEnabled] = useState(true);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    getSettings().then(s => {
+      setIsPaymentEnabled(s.isPaymentEnabled);
+      setLoading(false);
+    }).catch(() => setLoading(false));
+  }, []);
 
   const copyAccountNumber = () => {
     navigator.clipboard.writeText("9127813092");
@@ -19,6 +29,10 @@ export default function Verification({ user }: { user: any }) {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!user) return;
+    if (!isPaymentEnabled) {
+      toast("Payment verification is currently disabled.");
+      return;
+    }
     if (!reference.trim()) {
       toast("Please enter your payment reference");
       return;
@@ -42,6 +56,28 @@ export default function Verification({ user }: { user: any }) {
       setIsSubmitting(false);
     }
   };
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center py-20">
+        <Loader2 className="animate-spin text-blue-500" size={32} />
+      </div>
+    );
+  }
+
+  if (!isPaymentEnabled) {
+    return (
+      <div className="max-w-md mx-auto py-12 px-4 text-center">
+        <div className="glass-panel p-8 rounded-3xl space-y-4">
+          <ShieldAlert className="text-amber-500 mx-auto" size={48} />
+          <h1 className="text-2xl font-bold">Verification Disabled</h1>
+          <p className="text-[var(--foreground)]/60">
+            Payment verification is currently disabled by the admin. Please check back later or contact support.
+          </p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="max-w-md mx-auto py-12 px-4">

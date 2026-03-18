@@ -2,11 +2,11 @@ import React, { useState, useEffect } from "react";
 import { collection, addDoc, serverTimestamp, query, where, getDocs, updateDoc, doc, increment, deleteDoc, orderBy, limit, writeBatch } from "firebase/firestore";
 import { handleFirestoreError, OperationType } from "../utils/errorHandling";
 import { db } from "../firebase";
-import { ShieldAlert, Send, Search, BadgeCheck, Loader2, CheckCircle, Trash2, FileText, BookOpen } from "lucide-react";
+import { ShieldAlert, Send, Search, BadgeCheck, Loader2, CheckCircle, Trash2, FileText, BookOpen, ShieldCheck } from "lucide-react";
 import { Helmet } from "react-helmet-async";
 import { toast } from "../components/Toast";
 import ConfirmModal from "../components/ConfirmModal";
-import { getSettings, updateSettings } from "../lib/settings";
+import { getSettings, updateSettings, subscribeToSettings } from "../lib/settings";
 
 export default function Admin({ user }: { user: any }) {
   const [message, setMessage] = useState("");
@@ -21,15 +21,15 @@ export default function Admin({ user }: { user: any }) {
   const [queueLoading, setQueueLoading] = useState(true);
 
   const [contentSearch, setContentSearch] = useState("");
-  const [contentResults, setContentResults] = useState<{ courses: any[], resources: any[] }>({ courses: [], resources: [] });
+  const [contentResults, setContentResults] = useState<{ courses: any[], resources: any[], pending: any[] }>({ courses: [], resources: [], pending: [] });
   const [contentLoading, setContentLoading] = useState(false);
-  const [deleteConfirm, setDeleteConfirm] = useState<{id: string, type: 'course' | 'resource'} | null>(null);
+  const [deleteConfirm, setDeleteConfirm] = useState<{id: string, type: 'course' | 'resource' | 'pending'} | null>(null);
   const [isPaymentEnabled, setIsPaymentEnabled] = useState(true);
 
   useEffect(() => {
     if (!user || user.email !== "banmekeifeoluwa@gmail.com") return;
 
-    getSettings().then(s => setIsPaymentEnabled(s.isPaymentEnabled)).catch(console.error);
+    const unsubscribeSettings = subscribeToSettings(s => setIsPaymentEnabled(s.isPaymentEnabled));
 
     const fetchQueue = async () => {
       try {
@@ -57,6 +57,10 @@ export default function Admin({ user }: { user: any }) {
     };
 
     fetchQueue();
+
+    return () => {
+      unsubscribeSettings();
+    };
   }, [user]);
 
   const approveUser = async (userId: string) => {
@@ -138,12 +142,30 @@ export default function Admin({ user }: { user: any }) {
     setSearchLoading(true);
     setSearchResult(null);
     try {
-      const q = query(collection(db, "users"), where("email", "==", searchEmail.trim()));
-      const querySnapshot = await getDocs(q);
+      const emailLower = searchEmail.trim().toLowerCase();
+      const emailOriginal = searchEmail.trim();
+      const matricUpper = searchEmail.trim().toUpperCase();
+
+      const emailLowerQ = query(collection(db, "users"), where("email", "==", emailLower));
+      const emailOriginalQ = query(collection(db, "users"), where("email", "==", emailOriginal));
+      const matricQ = query(collection(db, "users"), where("matricNumber", "==", matricUpper));
+      const nameQ = query(collection(db, "users"), where("displayName", "==", emailOriginal));
       
-      if (!querySnapshot.empty) {
-        const userDoc = querySnapshot.docs[0];
-        setSearchResult({ id: userDoc.id, ...userDoc.data() });
+      const [emailLowerSnap, emailOriginalSnap, matricSnap, nameSnap] = await Promise.all([
+        getDocs(emailLowerQ), 
+        getDocs(emailOriginalQ), 
+        getDocs(matricQ),
+        getDocs(nameQ)
+      ]);
+      
+      let foundUser = null;
+      if (!emailLowerSnap.empty) foundUser = emailLowerSnap.docs[0];
+      else if (!emailOriginalSnap.empty) foundUser = emailOriginalSnap.docs[0];
+      else if (!matricSnap.empty) foundUser = matricSnap.docs[0];
+      else if (!nameSnap.empty) foundUser = nameSnap.docs[0];
+
+      if (foundUser) {
+        setSearchResult({ id: foundUser.id, ...foundUser.data() });
       } else {
         toast("User not found.");
       }
@@ -186,33 +208,50 @@ export default function Admin({ user }: { user: any }) {
       const resourcesSnap = await getDocs(resourcesQ);
       const resources = resourcesSnap.docs
         .map(doc => ({ id: doc.id, ...doc.data() }))
-        .filter((r: any) => r.title?.toLowerCase().includes(contentSearch.toLowerCase()) || r.course?.toLowerCase().includes(contentSearch.toLowerCase()));
+        .filter((r: any) => 
+          r.title?.toLowerCase().includes(contentSearch.toLowerCase()) || 
+          r.course?.toLowerCase().includes(contentSearch.toLowerCase()) ||
+          r.uploadedBy?.toLowerCase().includes(contentSearch.toLowerCase())
+        );
 
-      setContentResults({ courses, resources });
-      if (courses.length === 0 && resources.length === 0) {
+      // Search Pending Questions
+      const pendingQ = query(collection(db, "pending_questions"), limit(500));
+      const pendingSnap = await getDocs(pendingQ);
+      const pending = pendingSnap.docs
+        .map(doc => ({ id: doc.id, ...doc.data() }))
+        .filter((p: any) => 
+          p.courseCode?.toLowerCase().includes(contentSearch.toLowerCase()) || 
+          p.question?.toLowerCase().includes(contentSearch.toLowerCase()) ||
+          p.authorName?.toLowerCase().includes(contentSearch.toLowerCase()) ||
+          p.authorEmail?.toLowerCase().includes(contentSearch.toLowerCase())
+        );
+
+      setContentResults({ courses, resources, pending });
+      if (courses.length === 0 && resources.length === 0 && pending.length === 0) {
         toast("No matching content found.");
       }
     } catch (error) {
-      handleFirestoreError(error, OperationType.GET, "courses/resources");
+      handleFirestoreError(error, OperationType.GET, "content");
       toast("Failed to search content.");
     } finally {
       setContentLoading(false);
     }
   };
 
-  const handleDeleteContent = async (id: string, type: 'course' | 'resource') => {
+  const handleDeleteContent = async (id: string, type: 'course' | 'resource' | 'pending') => {
     try {
-      const collectionName = type === 'course' ? 'courses' : 'resources';
+      const collectionName = type === 'course' ? 'courses' : type === 'resource' ? 'resources' : 'pending_questions';
       await deleteDoc(doc(db, collectionName, id));
       
       setContentResults(prev => ({
         courses: type === 'course' ? prev.courses.filter(c => c.id !== id) : prev.courses,
-        resources: type === 'resource' ? prev.resources.filter(r => r.id !== id) : prev.resources
+        resources: type === 'resource' ? prev.resources.filter(r => r.id !== id) : prev.resources,
+        pending: type === 'pending' ? prev.pending.filter(p => p.id !== id) : prev.pending
       }));
       
       toast(`${type.charAt(0).toUpperCase() + type.slice(1)} removed successfully.`);
     } catch (error) {
-      const collectionName = type === 'course' ? 'courses' : 'resources';
+      const collectionName = type === 'course' ? 'courses' : type === 'resource' ? 'resources' : 'pending_questions';
       handleFirestoreError(error, OperationType.DELETE, `${collectionName}/${id}`);
       toast(`Failed to remove ${type}.`);
     }
@@ -340,7 +379,7 @@ export default function Admin({ user }: { user: any }) {
                   <tbody className="divide-y divide-[var(--border)]">
                     {paymentVerifications.map((p) => (
                       <tr key={p.id} className="hover:bg-black/5 dark:hover:bg-white/5 transition-colors">
-                        <td className="p-4 font-bold">{p.email}</td>
+                        <td className="p-4 font-bold">{p.userEmail}</td>
                         <td className="p-4 font-mono text-sm">{p.reference}</td>
                         <td className="p-4 text-right">
                           <button 
@@ -368,10 +407,10 @@ export default function Admin({ user }: { user: any }) {
 
         <form onSubmit={handleSearchUser} className="flex gap-3">
           <input
-            type="email"
+            type="text"
             value={searchEmail}
             onChange={(e) => setSearchEmail(e.target.value)}
-            placeholder="User Email..."
+            placeholder="User Email or Matric Number..."
             className="flex-1 bg-black/5 dark:bg-black/50 border border-[var(--border)] rounded-xl p-3 text-[var(--foreground)] focus:outline-none focus:ring-2 focus:ring-blue-500 font-medium"
             required
           />
@@ -394,26 +433,41 @@ export default function Admin({ user }: { user: any }) {
                   {searchResult.isVerified && <BadgeCheck size={16} className="text-blue-500" />}
                 </div>
                 <div className="text-sm text-[var(--foreground)]/60">{searchResult.email}</div>
+                <div className="text-xs text-[var(--foreground)]/40 font-mono">{searchResult.matricNumber || "No Matric"}</div>
               </div>
             </div>
             
-            {!searchResult.isVerified ? (
+            <div className="flex flex-col gap-2 items-end">
+              {!searchResult.isVerified ? (
+                <button
+                  onClick={handleVerifyUser}
+                  className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-xl font-bold transition-colors flex items-center gap-2 text-sm w-full justify-center"
+                >
+                  <BadgeCheck size={16} /> Verify User
+                </button>
+              ) : (
+                <span className="text-emerald-600 dark:text-emerald-400 font-bold text-sm bg-emerald-500/10 px-3 py-1 rounded-full">
+                  Verified
+                </span>
+              )}
+              
               <button
-                onClick={handleVerifyUser}
-                className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-xl font-bold transition-colors flex items-center gap-2 text-sm"
+                onClick={() => {
+                  setContentSearch(searchResult.displayName || searchResult.email);
+                  // Scroll to content search
+                  const contentSection = document.getElementById('content-management');
+                  if (contentSection) contentSection.scrollIntoView({ behavior: 'smooth' });
+                }}
+                className="bg-black/10 dark:bg-white/10 hover:bg-black/20 dark:hover:bg-white/20 px-4 py-2 rounded-xl font-bold transition-colors flex items-center gap-2 text-sm w-full justify-center"
               >
-                <BadgeCheck size={16} /> Verify User
+                <Search size={16} /> View Uploads
               </button>
-            ) : (
-              <span className="text-emerald-600 dark:text-emerald-400 font-bold text-sm bg-emerald-500/10 px-3 py-1 rounded-full">
-                Verified
-              </span>
-            )}
+            </div>
           </div>
         )}
       </div>
       
-      <div className="glass-panel p-8 rounded-3xl shadow-sm space-y-6">
+      <div id="content-management" className="glass-panel p-8 rounded-3xl shadow-sm space-y-6">
         <h2 className="text-2xl font-bold mb-2">Content Management</h2>
         <p className="text-sm text-[var(--foreground)]/60 mb-6 font-medium">
           Search and remove CBT courses or Vault resources.
@@ -486,15 +540,38 @@ export default function Admin({ user }: { user: any }) {
                 </div>
               </div>
             )}
+            {contentResults.pending.length > 0 && (
+              <div className="space-y-3">
+                <h3 className="text-sm font-bold text-[var(--foreground)]/40 uppercase tracking-widest flex items-center gap-2">
+                  <ShieldCheck size={14} /> Pending Questions ({contentResults.pending.length})
+                </h3>
+                <div className="grid gap-3">
+                  {contentResults.pending.map(q => (
+                    <div key={q.id} className="p-4 bg-black/5 dark:bg-white/5 border border-[var(--border)] rounded-2xl flex items-center justify-between group">
+                      <div>
+                        <div className="font-bold">{q.courseCode}: {q.question.substring(0, 50)}...</div>
+                        <div className="text-xs text-[var(--foreground)]/50">By: {q.authorName || q.authorEmail || "Unknown"}</div>
+                      </div>
+                      <button 
+                        onClick={() => setDeleteConfirm({id: q.id, type: 'pending'})}
+                        className="p-2 bg-red-500/10 text-red-500 rounded-xl opacity-0 group-hover:opacity-100 transition-opacity hover:bg-red-500 hover:text-white"
+                      >
+                        <Trash2 size={18} />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
         )}
       </div>
       
       <ConfirmModal
         isOpen={!!deleteConfirm}
-        title={`Delete ${deleteConfirm?.type === 'course' ? 'Course' : 'Resource'}`}
+        title={`Delete ${deleteConfirm?.type === 'course' ? 'Course' : deleteConfirm?.type === 'resource' ? 'Resource' : 'Question'}`}
         message={`Are you sure you want to remove this ${deleteConfirm?.type}? This action is irreversible.`}
-        onConfirm={() => deleteConfirm && handleDeleteContent(deleteConfirm.id, deleteConfirm.type)}
+        onConfirm={() => deleteConfirm && handleDeleteContent(deleteConfirm.id, deleteConfirm.type as any)}
         onCancel={() => setDeleteConfirm(null)}
       />
     </div>

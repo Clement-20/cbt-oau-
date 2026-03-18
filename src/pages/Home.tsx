@@ -101,6 +101,7 @@ export default function Home({ user }: { user: any }) {
         <title>Home | ICEPAB Nexus - OAU Student Super-App</title>
         <meta name="description" content="Welcome to ICEPAB Nexus, the ultimate OAU student super-app. Practice OAU CBT GST 111, use the OAU CGPA Calculator, and access OAU student resources." />
         <meta name="keywords" content="OAU CBT GST 111, OAU CGPA Calculator, OAU Freshers Guide, Obafemi Awolowo University, ICEPAB, OAU student portal, OAU E-Portal, Great Ife, OAU Nexus" />
+        <link rel="canonical" href={`${import.meta.env.NEXT_PUBLIC_BASE_URL || 'https://icepab-nexus.run.app'}/`} />
         <script type="application/ld+json">
           {`
             {

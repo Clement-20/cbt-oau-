@@ -5,7 +5,8 @@ import { db } from "../firebase";
 import { User, BadgeCheck, Upload, CreditCard, CheckCircle2, Loader2, Save, Flame, Clock, Target } from "lucide-react";
 import { Helmet } from "react-helmet-async";
 import { toast } from "../components/Toast";
-import { getSettings } from "../lib/settings";
+import { getSettings, subscribeToSettings } from "../lib/settings";
+import { Link } from "react-router-dom";
 
 export default function Profile({ user }: { user: any }) {
   const [displayName, setDisplayName] = useState("");
@@ -16,20 +17,17 @@ export default function Profile({ user }: { user: any }) {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [isPaymentEnabled, setIsPaymentEnabled] = useState(true);
-  
-  // Verification Flow State
-  // "idle" | "uploading" | "paying" | "success"
-  const [verifyStep, setVerifyStep] = useState("idle");
-  const [file, setFile] = useState<File | null>(null);
 
   useEffect(() => {
     if (!user) return;
+    
+    const unsubscribeSettings = subscribeToSettings((s) => {
+      setIsPaymentEnabled(s.isPaymentEnabled);
+    });
+
     const fetchProfile = async () => {
       try {
-        const [userSnap, settings] = await Promise.all([
-          getDoc(doc(db, "users", user.uid)),
-          getSettings()
-        ]);
+        const userSnap = await getDoc(doc(db, "users", user.uid));
         if (userSnap.exists()) {
           const data = userSnap.data();
           setDisplayName(data.displayName || "");
@@ -38,14 +36,17 @@ export default function Profile({ user }: { user: any }) {
           setCbtTimeSpent(data.cbtTimeSpent || 0);
           setHighScoreCount(data.highScoreCount || 0);
         }
-        setIsPaymentEnabled(settings.isPaymentEnabled);
       } catch (error) {
-        handleFirestoreError(error, OperationType.GET, "users/settings");
+        handleFirestoreError(error, OperationType.GET, `users/${user.uid}`);
       } finally {
         setLoading(false);
       }
     };
     fetchProfile();
+
+    return () => {
+      unsubscribeSettings();
+    };
   }, [user]);
 
   const handleSaveProfile = async () => {
@@ -61,36 +62,6 @@ export default function Profile({ user }: { user: any }) {
     } finally {
       setSaving(false);
     }
-  };
-
-  const startVerification = () => setVerifyStep("uploading");
-
-  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files && e.target.files[0]) {
-      setFile(e.target.files[0]);
-    }
-  };
-
-  const proceedToPayment = () => {
-    if (!file) return toast("Please upload your Student ID or Portal Biodata first.");
-    setVerifyStep("paying");
-  };
-
-  const simulatePayment = () => {
-    setVerifyStep("processing");
-    setTimeout(async () => {
-      try {
-        const docRef = doc(db, "users", user.uid);
-        await updateDoc(docRef, { isVerified: true });
-        setIsVerified(true);
-        setVerifyStep("success");
-        setFile(null); // "Delete" the file after verification
-      } catch (error) {
-        handleFirestoreError(error, OperationType.UPDATE, `users/${user.uid}`);
-        toast("Payment succeeded but verification failed. Please contact admin.");
-        setVerifyStep("idle");
-      }
-    }, 2000);
   };
 
   if (!user) {
@@ -233,66 +204,12 @@ export default function Profile({ user }: { user: any }) {
                 Get the official blue tick to stand out. Verification requires a one-time payment of ₦1,000 and a valid Student ID or Portal Biodata screenshot (deleted immediately after verification).
               </p>
 
-              {verifyStep === "idle" && (
-                <button
-                  onClick={startVerification}
-                  className="flex items-center justify-center gap-2 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white px-6 py-4 rounded-2xl font-bold transition-all shadow-md w-full sm:w-auto"
-                >
-                  <BadgeCheck size={20} /> Become Verified
-                </button>
-              )}
-
-              {verifyStep === "uploading" && (
-                <div className="bg-black/5 dark:bg-white/5 border border-[var(--border)] p-6 rounded-2xl space-y-4 animate-in fade-in slide-in-from-bottom-4">
-                  <h3 className="font-bold text-lg flex items-center gap-2"><Upload size={18} /> Step 1: Upload ID</h3>
-                  <p className="text-sm text-[var(--foreground)]/60">Upload your Student ID or Portal Biodata screenshot. This will be securely processed and deleted.</p>
-                  <input
-                    type="file"
-                    accept="image/*"
-                    onChange={handleFileUpload}
-                    className="w-full bg-black/5 dark:bg-black/50 border border-[var(--border)] rounded-xl p-3 text-[var(--foreground)]/60 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-bold file:bg-blue-500/10 file:text-blue-600 dark:file:text-blue-400 hover:file:bg-blue-500/20 transition-all cursor-pointer"
-                  />
-                  <div className="flex gap-3 pt-2">
-                    <button onClick={() => setVerifyStep("idle")} className="px-4 py-2 rounded-xl font-bold text-[var(--foreground)]/60 hover:bg-black/5 dark:hover:bg-white/10 transition-colors">Cancel</button>
-                    <button onClick={proceedToPayment} disabled={!file} className="flex-1 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-xl font-bold transition-colors disabled:opacity-50">Continue to Payment</button>
-                  </div>
-                </div>
-              )}
-
-              {verifyStep === "paying" && (
-                <div className="bg-black/5 dark:bg-white/5 border border-[var(--border)] p-6 rounded-2xl space-y-4 animate-in fade-in slide-in-from-bottom-4">
-                  <h3 className="font-bold text-lg flex items-center gap-2"><CreditCard size={18} /> Step 2: Payment</h3>
-                  <div className="bg-blue-500/10 border border-blue-500/20 p-4 rounded-xl text-center">
-                    <div className="text-sm font-bold text-blue-600 dark:text-blue-400 uppercase tracking-wider mb-1">Total Amount</div>
-                    <div className="text-3xl font-bold">₦1,000</div>
-                  </div>
-                  <p className="text-sm text-[var(--foreground)]/60 text-center">This is a simulated payment for the prototype.</p>
-                  <div className="flex gap-3 pt-2">
-                    <button onClick={() => setVerifyStep("uploading")} className="px-4 py-2 rounded-xl font-bold text-[var(--foreground)]/60 hover:bg-black/5 dark:hover:bg-white/10 transition-colors">Back</button>
-                    <button onClick={simulatePayment} className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-xl font-bold transition-colors flex justify-center items-center gap-2">
-                      Pay ₦1,000 Now
-                    </button>
-                  </div>
-                </div>
-              )}
-
-              {verifyStep === "processing" && (
-                <div className="bg-black/5 dark:bg-white/5 border border-[var(--border)] p-10 rounded-2xl flex flex-col items-center justify-center space-y-4">
-                  <Loader2 className="animate-spin text-blue-500" size={40} />
-                  <p className="font-bold text-lg">Processing Payment & Verifying ID...</p>
-                  <p className="text-sm text-[var(--foreground)]/50">Please do not close this window.</p>
-                </div>
-              )}
-              
-              {verifyStep === "success" && (
-                <div className="bg-emerald-500/10 border border-emerald-500/20 p-8 rounded-2xl flex flex-col items-center justify-center space-y-4 text-center animate-in zoom-in">
-                  <div className="w-16 h-16 bg-emerald-500 rounded-full flex items-center justify-center text-white shadow-lg shadow-emerald-500/30 mb-2">
-                    <CheckCircle2 size={32} />
-                  </div>
-                  <h3 className="font-bold text-2xl text-emerald-700 dark:text-emerald-400">Verification Complete!</h3>
-                  <p className="text-[var(--foreground)]/70 font-medium">Your ID has been verified and deleted from our servers. Enjoy your blue tick!</p>
-                </div>
-              )}
+              <Link
+                to="/verification"
+                className="flex items-center justify-center gap-2 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white px-6 py-4 rounded-2xl font-bold transition-all shadow-md w-full sm:w-auto"
+              >
+                <BadgeCheck size={20} /> Become Verified
+              </Link>
             </div>
           )}
         </div>

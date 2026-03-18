@@ -91,7 +91,7 @@ service cloud.firestore {
 
     match /flex_store_listings/{listingId} {
       allow read: if isAuthenticated();
-      allow create: if isAuthenticated() && hasRequiredFields(['itemName', 'price', 'whatsappNumber', 'imageUrl', 'vendorUid']) && isValidString('itemName', 1, 100) && isNonNegative('price') && hasOnlyAllowedFields(['itemName', 'category', 'price', 'whatsappNumber', 'imageUrl', 'vendorName', 'vendorUid', 'createdAt']);
+      allow create: if isAuthenticated() && hasRequiredFields(['itemName', 'price', 'whatsappNumber', 'imageUrl', 'vendorUid']) && isValidString('itemName', 1, 100) && isNonNegative('price') && hasOnlyAllowedFields(['itemName', 'category', 'price', 'whatsappNumber', 'location', 'imageUrl', 'vendorName', 'vendorUid', 'createdAt']);
       allow update: if isAuthenticated() && request.auth.uid == resource.data.vendorUid && areImmutableFieldsUnchanged(['vendorUid', 'createdAt']);
       allow delete: if isAdmin() || (isAuthenticated() && request.auth.uid == resource.data.vendorUid);
     }
@@ -101,6 +101,12 @@ service cloud.firestore {
       allow create: if isAuthenticated() && hasRequiredFields(['userId', 'reference', 'status']) && hasOnlyAllowedFields(['userId', 'userEmail', 'userName', 'reference', 'status', 'timestamp']);
       allow update: if isAdmin();
       allow delete: if isAdmin();
+    }
+
+    match /whispers/{whisperId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated() && hasRequiredFields(['text', 'author', 'authorUid']) && isValidString('text', 1, 500) && hasOnlyAllowedFields(['text', 'author', 'authorUid', 'timestamp']);
+      allow update, delete: if isAdmin();
     }
 
     match /resources/{resourceId} {

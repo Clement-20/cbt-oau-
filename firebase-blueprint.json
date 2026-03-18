@@ -102,6 +102,49 @@
         "timestamp": { "type": "string", "format": "date-time" }
       },
       "required": ["userId", "userName", "text", "rating"]
+    },
+    "Whisper": {
+      "title": "Whisper",
+      "description": "An anonymous or semi-anonymous message in the community feed",
+      "type": "object",
+      "properties": {
+        "text": { "type": "string" },
+        "author": { "type": "string" },
+        "authorUid": { "type": "string" },
+        "timestamp": { "type": "string", "format": "date-time" }
+      },
+      "required": ["text", "author", "authorUid"]
+    },
+    "FlexStoreListing": {
+      "title": "Flex Store Listing",
+      "description": "A product or service listed in the campus marketplace",
+      "type": "object",
+      "properties": {
+        "itemName": { "type": "string" },
+        "category": { "type": "string" },
+        "price": { "type": "number" },
+        "whatsappNumber": { "type": "string" },
+        "location": { "type": "string" },
+        "imageUrl": { "type": "string" },
+        "vendorName": { "type": "string" },
+        "vendorUid": { "type": "string" },
+        "createdAt": { "type": "number" }
+      },
+      "required": ["itemName", "category", "price", "whatsappNumber", "location", "imageUrl", "vendorName", "vendorUid", "createdAt"]
+    },
+    "PaymentVerification": {
+      "title": "Payment Verification",
+      "description": "A request for student verification via payment reference",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "userEmail": { "type": "string" },
+        "userName": { "type": "string" },
+        "reference": { "type": "string" },
+        "status": { "type": "string", "enum": ["pending", "approved", "rejected"] },
+        "timestamp": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userId", "userEmail", "userName", "reference", "status"]
     }
   },
   "firestore": {
@@ -132,6 +175,18 @@
     "/community_reviews/{reviewId}": {
       "schema": { "$ref": "#/entities/CommunityReview" },
       "description": "Stores community reviews"
+    },
+    "/whispers/{whisperId}": {
+      "schema": { "$ref": "#/entities/Whisper" },
+      "description": "Stores community whispers"
+    },
+    "/flex_store_listings/{listingId}": {
+      "schema": { "$ref": "#/entities/FlexStoreListing" },
+      "description": "Stores campus marketplace listings"
+    },
+    "/payment_verifications/{verificationId}": {
+      "schema": { "$ref": "#/entities/PaymentVerification" },
+      "description": "Stores student payment verification requests"
     }
   }
 }

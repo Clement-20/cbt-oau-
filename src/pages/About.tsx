@@ -9,14 +9,14 @@ export default function About() {
       role: "Lead Developer",
       phone: "+2349127813092",
       whatsapp: "https://wa.me/2349127813092",
-      description: "Visionary behind ICEPAB Digital Nexus, focused on bridging the gap between traditional learning and digital efficiency."
+      description: "Does everything about developing the app, focusing on bridging the gap between traditional learning and digital efficiency."
     },
     {
       name: "Nova xit",
-      role: "Co-developer",
+      role: "Co-developer / Innovator",
       phone: "+234 805 166 0552",
       whatsapp: "https://wa.me/2348051660552",
-      description: "Expert in system optimization and UI/UX design, ensuring a seamless experience for every student."
+      description: "The Innovator, bringing new ideas and ensuring a seamless experience for every student."
     }
   ];
 

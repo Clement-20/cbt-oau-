@@ -497,6 +497,12 @@ export default function CBT({ user, isFocusMode, setIsFocusMode }: { user: any, 
           </div>
         </div>
 
+        {showCalculator && (
+          <div className="animate-in slide-in-from-top-4 duration-300">
+            <Calculator onClose={() => setShowCalculator(false)} />
+          </div>
+        )}
+
         <div className="glass-panel p-8 md:p-10 rounded-3xl space-y-8 shadow-sm relative">
           <div className="flex justify-between items-start gap-4">
             <h3 className="text-2xl font-medium leading-relaxed">{q.question}</h3>
@@ -563,6 +569,7 @@ export default function CBT({ user, isFocusMode, setIsFocusMode }: { user: any, 
       <Helmet>
         <title>CBT Engine | ICEPAB Nexus</title>
         <meta name="description" content="Practice exams for GST 111, BUS 101, SOC 101, and AMS 103 on the ICEPAB Nexus CBT Engine." />
+        <link rel="canonical" href={`${import.meta.env.NEXT_PUBLIC_BASE_URL || 'https://icepab-nexus.run.app'}/cbt`} />
         <script type="application/ld+json">
           {`
             {
@@ -596,6 +603,13 @@ export default function CBT({ user, isFocusMode, setIsFocusMode }: { user: any, 
         </div>
 
         <div className="flex items-center gap-4">
+          <button 
+            onClick={() => setShowCalculator(!showCalculator)}
+            className={`p-3 rounded-xl transition-all border ${showCalculator ? 'bg-cyan-500 text-white border-cyan-400 shadow-[0_0_15px_rgba(6,182,212,0.4)]' : 'bg-black/5 dark:bg-white/5 text-[var(--foreground)]/60 border-[var(--border)] hover:bg-black/10 dark:hover:bg-white/10'}`}
+            title="Toggle Calculator"
+          >
+            <CalcIcon size={20} />
+          </button>
           {setIsFocusMode && (
             <button 
               onClick={() => setIsFocusMode(!isFocusMode)}
@@ -621,6 +635,12 @@ export default function CBT({ user, isFocusMode, setIsFocusMode }: { user: any, 
           )}
         </div>
       </div>
+
+      {showCalculator && (
+        <div className="animate-in slide-in-from-top-4 duration-300">
+          <Calculator onClose={() => setShowCalculator(false)} />
+        </div>
+      )}
 
       {!isFocusMode && (hostedTests.length > 0 || isLoadingTests) ? (
         <div className="mb-8">
@@ -769,8 +789,6 @@ export default function CBT({ user, isFocusMode, setIsFocusMode }: { user: any, 
           onClose={() => setMetricsTestId(null)} 
         />
       )}
-
-      {showCalculator && <Calculator onClose={() => setShowCalculator(false)} />}
     </div>
   );
 }
