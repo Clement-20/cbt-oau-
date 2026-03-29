@@ -1,12 +1,13 @@
 import React, { useState, useEffect } from "react";
-import { doc, getDoc, updateDoc } from "firebase/firestore";
+import { doc, getDoc, updateDoc, collection, query, where, getDocs, count } from "firebase/firestore";
 import { handleFirestoreError, OperationType } from "../utils/errorHandling";
 import { db } from "../firebase";
-import { User, BadgeCheck, Upload, CreditCard, CheckCircle2, Loader2, Save, Flame, Clock, Target, Share2 } from "lucide-react";
+import { User, BadgeCheck, Upload, CreditCard, CheckCircle2, Loader2, Save, Flame, Clock, Target, Share2, ThumbsUp, Users, Twitter, Linkedin, ExternalLink } from "lucide-react";
 import { Helmet } from "react-helmet-async";
 import { toast } from "../components/Toast";
-import { getSettings, subscribeToSettings } from "../lib/settings";
+import { subscribeToSettings } from "../lib/settings";
 import { Link } from "react-router-dom";
+import { useAcademicStore } from "../lib/academicStore";
 
 export default function Profile({ user }: { user: any }) {
   const [displayName, setDisplayName] = useState("");
@@ -17,6 +18,15 @@ export default function Profile({ user }: { user: any }) {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [isPaymentEnabled, setIsPaymentEnabled] = useState(true);
+  
+  // Social Stats
+  const [stats, setStats] = useState({
+    uploads: 0,
+    totalLikes: 0,
+    followers: 0
+  });
+
+  const { followedUploaders } = useAcademicStore();
 
   useEffect(() => {
     if (!user) return;
@@ -25,8 +35,9 @@ export default function Profile({ user }: { user: any }) {
       setIsPaymentEnabled(s.isPaymentEnabled);
     });
 
-    const fetchProfile = async () => {
+    const fetchProfileData = async () => {
       try {
+        // Fetch User Doc
         const userSnap = await getDoc(doc(db, "users", user.uid));
         if (userSnap.exists()) {
           const data = userSnap.data();
@@ -36,13 +47,33 @@ export default function Profile({ user }: { user: any }) {
           setCbtTimeSpent(data.cbtTimeSpent || 0);
           setHighScoreCount(data.highScoreCount || 0);
         }
+
+        // Fetch Uploads & Likes
+        const resourcesQ = query(collection(db, "resources"), where("userId", "==", user.uid));
+        const resourcesSnap = await getDocs(resourcesQ);
+        let totalLikes = 0;
+        resourcesSnap.forEach(doc => {
+          totalLikes += (doc.data().likes || 0);
+        });
+
+        // Fetch Followers (Query users where followedUploaders contains user.uid)
+        // Note: This might be expensive, in a real app we'd store a counter
+        const followersQ = query(collection(db, "users"), where("followedUploaders", "array-contains", user.uid));
+        const followersSnap = await getDocs(followersQ);
+
+        setStats({
+          uploads: resourcesSnap.size,
+          totalLikes,
+          followers: followersSnap.size
+        });
+
       } catch (error) {
         handleFirestoreError(error, OperationType.GET, `users/${user.uid}`);
       } finally {
         setLoading(false);
       }
     };
-    fetchProfile();
+    fetchProfileData();
 
     return () => {
       unsubscribeSettings();
@@ -73,97 +104,177 @@ export default function Profile({ user }: { user: any }) {
   }
 
   return (
-    <div className="max-w-2xl mx-auto space-y-8">
+    <div className="max-w-2xl mx-auto space-y-8 pb-20">
       <Helmet>
         <title>Profile | Digital Nexus</title>
         <meta name="description" content="Manage your Digital Nexus profile and verification status." />
       </Helmet>
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tighter flex items-center gap-3">
-            <User className="text-blue-500" /> User Profile
-          </h1>
-          <p className="text-[var(--foreground)]/60 mt-2 font-medium">Manage your identity and verification status.</p>
+
+      {/* Profile Header */}
+      <div className="relative">
+        <div className="h-32 bg-gradient-to-r from-blue-600 to-indigo-600 rounded-t-[40px]"></div>
+        <div className="px-8 -mt-12 flex flex-col sm:flex-row items-end gap-6">
+          <div className="relative">
+            <img 
+              src={user.photoURL || `https://api.dicebear.com/7.x/avataaars/svg?seed=${user.uid}`} 
+              alt={displayName} 
+              className="w-32 h-32 rounded-[40px] border-4 border-[var(--background)] bg-[var(--background)] shadow-xl"
+            />
+            {isVerified && (
+              <div className="absolute -bottom-2 -right-2 bg-blue-500 text-white p-2 rounded-2xl shadow-lg border-4 border-[var(--background)]">
+                <BadgeCheck size={24} />
+              </div>
+            )}
+          </div>
+          <div className="flex-1 pb-2">
+            <h1 className="text-3xl font-black tracking-tighter flex items-center gap-2">
+              {displayName || "Student"}
+              {isVerified && <span className="text-xs bg-blue-500/10 text-blue-600 px-3 py-1 rounded-full uppercase tracking-widest font-black">ICEPAB Scholar</span>}
+            </h1>
+            <p className="text-[var(--foreground)]/50 font-bold text-sm tracking-tight">{user.email}</p>
+          </div>
+          <button 
+            onClick={() => {
+              const text = `Check out my student profile on Digital Nexus! ${isShana ? "I'm a Certified Shana! 🔥" : ""} ${isVerified ? "I'm Verified! ✅" : ""}`;
+              window.dispatchEvent(new CustomEvent("open-share-modal", {
+                detail: {
+                  title: `${displayName}'s Profile`,
+                  text: text,
+                  url: window.location.origin
+                }
+              }));
+            }}
+            className="flex items-center justify-center gap-2 bg-white dark:bg-zinc-800 text-[var(--foreground)] border border-[var(--border)] px-5 py-3 rounded-2xl font-bold transition-all shadow-sm mb-2 hover:scale-105 active:scale-95"
+          >
+            <Share2 size={18} /> Share
+          </button>
         </div>
-        <button 
-          onClick={() => {
-            const text = `Check out my student profile on Digital Nexus! ${isShana ? "I'm a Certified Shana! 🔥" : ""} ${isVerified ? "I'm Verified! ✅" : ""}`;
-            window.dispatchEvent(new CustomEvent("open-share-modal", {
-              detail: {
-                title: `${displayName}'s Profile`,
-                text: text,
-                url: window.location.origin
-              }
-            }));
-          }}
-          className="flex items-center justify-center gap-2 bg-emerald-500 hover:bg-emerald-600 text-white px-5 py-3 rounded-xl font-bold transition-all shadow-md shrink-0"
-        >
-          <Share2 size={18} /> Share Profile
-        </button>
+      </div>
+
+      {/* Social Stats Grid */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+        {[
+          { label: "Uploads", value: stats.uploads, icon: Upload, color: "text-blue-500" },
+          { label: "Likes", value: stats.totalLikes, icon: ThumbsUp, color: "text-emerald-500" },
+          { label: "Followers", value: stats.followers, icon: Users, color: "text-purple-500" },
+          { label: "Following", value: followedUploaders.length, icon: Users, color: "text-amber-500" },
+        ].map((stat, i) => (
+          <div key={i} className="glass-panel p-4 rounded-3xl text-center border border-[var(--border)]">
+            <div className={`w-10 h-10 rounded-2xl bg-black/5 dark:bg-white/5 flex items-center justify-center mx-auto mb-2 ${stat.color}`}>
+              <stat.icon size={20} />
+            </div>
+            <div className="text-xl font-black tracking-tighter">{stat.value}</div>
+            <div className="text-[10px] font-bold text-[var(--foreground)]/40 uppercase tracking-widest">{stat.label}</div>
+          </div>
+        ))}
       </div>
 
       {/* Profile Edit Section */}
-      <div className="glass-panel p-8 rounded-3xl shadow-sm space-y-6">
-        <h2 className="text-2xl font-bold flex items-center gap-2">
+      <div className="glass-panel p-8 rounded-[40px] shadow-sm space-y-6">
+        <h2 className="text-2xl font-black tracking-tighter flex items-center gap-2">
           Profile Settings
         </h2>
         
         <div className="space-y-4">
           <div>
-            <label className="block text-sm font-bold text-[var(--foreground)]/80 mb-2">Display Name</label>
+            <label className="block text-[10px] font-black text-[var(--foreground)]/40 uppercase tracking-widest ml-2 mb-1">Display Name</label>
             <input
               type="text"
               value={displayName}
               onChange={(e) => setDisplayName(e.target.value)}
-              className="w-full bg-black/5 dark:bg-black/50 border border-[var(--border)] rounded-2xl p-4 text-[var(--foreground)] focus:outline-none focus:ring-2 focus:ring-blue-500 font-medium transition-all"
+              placeholder="How should students see you?"
+              className="w-full bg-black/5 dark:bg-black/50 border border-[var(--border)] rounded-2xl p-4 text-[var(--foreground)] focus:outline-none focus:ring-2 focus:ring-blue-500 font-bold transition-all"
             />
           </div>
           
-          <button
-            onClick={handleSaveProfile}
-            disabled={saving || !displayName.trim()}
-            className="flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-xl font-bold transition-all shadow-md disabled:opacity-50"
-          >
-            {saving ? <Loader2 className="animate-spin" size={18} /> : <Save size={18} />} Save Changes
-          </button>
+          <div className="flex flex-col sm:flex-row gap-4">
+            <button
+              onClick={handleSaveProfile}
+              disabled={saving || !displayName.trim()}
+              className="flex-1 flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-8 py-4 rounded-2xl font-black uppercase tracking-widest transition-all shadow-xl shadow-blue-500/20 disabled:opacity-50"
+            >
+              {saving ? <Loader2 className="animate-spin" size={18} /> : <Save size={18} />} Save Changes
+            </button>
+
+            {user.email === "banmekeifeoluwa@gmail.com" && (
+              <Link
+                to="/admin-dashboard"
+                className="flex-1 flex items-center justify-center gap-2 bg-red-600 hover:bg-red-700 text-white px-8 py-4 rounded-2xl font-black uppercase tracking-widest transition-all shadow-xl shadow-red-500/20"
+              >
+                <BadgeCheck size={18} /> Admin Dashboard
+              </Link>
+            )}
+          </div>
         </div>
       </div>
 
+      {/* Verification Section */}
+      {isPaymentEnabled && (
+        <div className="glass-panel p-8 rounded-[40px] shadow-sm space-y-6 relative overflow-hidden border-2 border-blue-500/20">
+          <div className="absolute -top-12 -right-12 w-48 h-48 bg-blue-600/10 rounded-full blur-3xl"></div>
+          
+          <h2 className="text-2xl font-black tracking-tighter flex items-center gap-2 relative z-10">
+            Verification Status
+            {isVerified && <BadgeCheck className="text-blue-500" size={24} />}
+          </h2>
+
+          {isVerified ? (
+            <div className="bg-blue-500/10 border border-blue-500/20 p-6 rounded-3xl relative z-10">
+              <div className="flex items-center gap-3 text-blue-700 dark:text-blue-400 font-black text-xl mb-2">
+                <CheckCircle2 size={24} /> You are Verified!
+              </div>
+              <p className="text-[var(--foreground)]/70 font-bold">
+                You have the official ICEPAB Nexus blue tick. Your uploads are prioritized and you stand out in the community.
+              </p>
+            </div>
+          ) : (
+            <div className="space-y-6 relative z-10">
+              <p className="text-[var(--foreground)]/70 font-bold">
+                Get the official ICEPAB Scholar badge. Verification grants unlimited AI explanations, priority resource ranking, and a professional profile.
+              </p>
+
+              <Link
+                to="/verification"
+                className="flex items-center justify-center gap-2 bg-gradient-to-r from-blue-600 to-indigo-600 hover:scale-[1.02] text-white px-8 py-5 rounded-2xl font-black uppercase tracking-widest transition-all shadow-xl shadow-blue-500/20 w-full sm:w-auto"
+              >
+                <CreditCard size={20} /> Verify for ₦500
+              </Link>
+            </div>
+          )}
+        </div>
+      )}
+
       {/* Shana Status Section */}
-      <div className="glass-panel p-8 rounded-3xl shadow-sm space-y-6 relative overflow-hidden">
-        {isShana && (
-          <div className="absolute top-0 right-0 p-6 opacity-10 text-orange-500 pointer-events-none">
-            <Flame size={120} />
-          </div>
-        )}
+      <div className="glass-panel p-8 rounded-[40px] shadow-sm space-y-6 relative overflow-hidden border-2 border-orange-500/20">
+        <div className="absolute -top-12 -right-12 w-48 h-48 bg-orange-500/10 rounded-full blur-3xl"></div>
         
-        <h2 className="text-2xl font-bold flex items-center gap-2 relative z-10">
-          Shana Status
+        <h2 className="text-2xl font-black tracking-tighter flex items-center gap-2 relative z-10">
+          Shana Mastery
           {isShana && <Flame className="text-orange-500" size={24} />}
         </h2>
 
         {isShana ? (
-          <div className="bg-orange-500/10 border border-orange-500/20 p-6 rounded-2xl relative z-10">
-            <div className="flex items-center gap-3 text-orange-700 dark:text-orange-400 font-bold text-lg mb-2">
-              <Flame size={24} /> You are a Certified Shana!
+          <div className="bg-orange-500/10 border border-orange-500/20 p-6 rounded-3xl relative z-10">
+            <div className="flex items-center gap-3 text-orange-700 dark:text-orange-400 font-black text-xl mb-2">
+              <Flame size={24} /> Certified Shana!
             </div>
-            <p className="text-[var(--foreground)]/70 font-medium">
+            <p className="text-[var(--foreground)]/70 font-bold">
               You've mastered the CBT engine. Your dedication is visible to everyone on the leaderboard.
             </p>
           </div>
         ) : (
           <div className="space-y-6 relative z-10">
-            <p className="text-[var(--foreground)]/70 font-medium">
+            <p className="text-[var(--foreground)]/70 font-bold">
               Earn the exclusive <Flame className="inline text-orange-500" size={18}/> Shana badge by proving your dedication in the CBT Engine.
             </p>
             
             <div className="grid sm:grid-cols-2 gap-4">
-              <div className="bg-black/5 dark:bg-white/5 border border-[var(--border)] p-5 rounded-2xl">
-                <div className="flex items-center gap-2 font-bold mb-2">
-                  <Clock size={18} className="text-blue-500" /> Time Spent
+              <div className="bg-black/5 dark:bg-white/5 border border-[var(--border)] p-5 rounded-3xl">
+                <div className="flex items-center gap-2 font-black text-[10px] uppercase tracking-widest mb-2 opacity-40">
+                  <Clock size={14} /> Time Spent
                 </div>
-                <div className="text-2xl font-mono font-bold">
-                  {Math.floor(cbtTimeSpent / 60)} / 60 <span className="text-sm text-[var(--foreground)]/50">mins</span>
+                <div className="text-2xl font-black tracking-tighter">
+                  {Math.floor(cbtTimeSpent / 60)} / 60 <span className="text-xs text-[var(--foreground)]/50">MINS</span>
                 </div>
                 <div className="w-full bg-black/10 dark:bg-white/10 h-2 rounded-full mt-3 overflow-hidden">
                   <div 
@@ -173,12 +284,12 @@ export default function Profile({ user }: { user: any }) {
                 </div>
               </div>
               
-              <div className="bg-black/5 dark:bg-white/5 border border-[var(--border)] p-5 rounded-2xl">
-                <div className="flex items-center gap-2 font-bold mb-2">
-                  <Target size={18} className="text-emerald-500" /> High Scores (80%+)
+              <div className="bg-black/5 dark:bg-white/5 border border-[var(--border)] p-5 rounded-3xl">
+                <div className="flex items-center gap-2 font-black text-[10px] uppercase tracking-widest mb-2 opacity-40">
+                  <Target size={14} /> High Scores
                 </div>
-                <div className="text-2xl font-mono font-bold">
-                  {highScoreCount} / 3 <span className="text-sm text-[var(--foreground)]/50">tests</span>
+                <div className="text-2xl font-black tracking-tighter">
+                  {highScoreCount} / 3 <span className="text-xs text-[var(--foreground)]/50">TESTS</span>
                 </div>
                 <div className="w-full bg-black/10 dark:bg-white/10 h-2 rounded-full mt-3 overflow-hidden">
                   <div 
@@ -192,45 +303,47 @@ export default function Profile({ user }: { user: any }) {
         )}
       </div>
 
-      {/* Verification Section */}
-      {isPaymentEnabled && (
-        <div className="glass-panel p-8 rounded-3xl shadow-sm space-y-6 relative overflow-hidden">
-          {isVerified && (
-            <div className="absolute top-0 right-0 p-6 opacity-10 text-blue-500 pointer-events-none">
-              <BadgeCheck size={120} />
-            </div>
-          )}
-          
-          <h2 className="text-2xl font-bold flex items-center gap-2 relative z-10">
-            Verification Status
-            {isVerified && <BadgeCheck className="text-blue-500" size={24} />}
-          </h2>
-
-          {isVerified ? (
-            <div className="bg-blue-500/10 border border-blue-500/20 p-6 rounded-2xl relative z-10">
-              <div className="flex items-center gap-3 text-blue-700 dark:text-blue-400 font-bold text-lg mb-2">
-                <CheckCircle2 size={24} /> You are Verified!
+      {/* Support & Links */}
+      <div className="glass-panel p-8 rounded-[40px] shadow-sm space-y-6">
+        <h2 className="text-2xl font-black tracking-tighter">Nexus Support</h2>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <a 
+            href="https://x.com/clementifeoluwa" 
+            target="_blank" 
+            rel="noopener noreferrer"
+            className="flex items-center justify-between p-5 bg-black/5 dark:bg-white/5 border border-[var(--border)] rounded-3xl hover:bg-blue-500/5 hover:border-blue-500/30 transition-all group"
+          >
+            <div className="flex items-center gap-4">
+              <div className="w-12 h-12 rounded-2xl bg-black dark:bg-white text-white dark:text-black flex items-center justify-center shadow-lg">
+                <Twitter size={24} />
               </div>
-              <p className="text-[var(--foreground)]/70 font-medium">
-                You have the official ICEPAB Nexus blue tick. You stand out on the leaderboard and validator queue.
-              </p>
+              <div>
+                <div className="font-black tracking-tighter">Founder's X</div>
+                <div className="text-[10px] font-bold text-[var(--foreground)]/40 uppercase tracking-widest">Updates & Support</div>
+              </div>
             </div>
-          ) : (
-            <div className="space-y-6 relative z-10">
-              <p className="text-[var(--foreground)]/70 font-medium">
-                Get the official blue tick to stand out. Verification requires a one-time payment of ₦1,000 and a valid Student ID or Portal Biodata screenshot (deleted immediately after verification).
-              </p>
+            <ExternalLink size={18} className="opacity-0 group-hover:opacity-100 transition-opacity" />
+          </a>
 
-              <Link
-                to="/verification"
-                className="flex items-center justify-center gap-2 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white px-6 py-4 rounded-2xl font-bold transition-all shadow-md w-full sm:w-auto"
-              >
-                <BadgeCheck size={20} /> Become Verified
-              </Link>
+          <a 
+            href="https://linkedin.com/in/clementifeoluwa" 
+            target="_blank" 
+            rel="noopener noreferrer"
+            className="flex items-center justify-between p-5 bg-black/5 dark:bg-white/5 border border-[var(--border)] rounded-3xl hover:bg-blue-700/5 hover:border-blue-700/30 transition-all group"
+          >
+            <div className="flex items-center gap-4">
+              <div className="w-12 h-12 rounded-2xl bg-[#0077b5] text-white flex items-center justify-center shadow-lg">
+                <Linkedin size={24} />
+              </div>
+              <div>
+                <div className="font-black tracking-tighter">LinkedIn</div>
+                <div className="text-[10px] font-bold text-[var(--foreground)]/40 uppercase tracking-widest">Professional Connect</div>
+              </div>
             </div>
-          )}
+            <ExternalLink size={18} className="opacity-0 group-hover:opacity-100 transition-opacity" />
+          </a>
         </div>
-      )}
+      </div>
     </div>
   );
 }

@@ -10,8 +10,8 @@ export default function BottomNav() {
   const navItems = [
     { path: "/", label: "Home", icon: Home },
     { path: "/cbt", label: "CBT", icon: Zap },
+    { path: "/study-mode", label: "Study", icon: BookOpen },
     { path: "/resources", label: "Resources", icon: Star },
-    { path: "/gpa", label: "CGPA", icon: Calculator },
     { path: "/profile", label: "Profile", icon: User },
   ];
 

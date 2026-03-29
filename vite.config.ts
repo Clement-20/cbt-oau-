@@ -17,7 +17,10 @@ export default defineConfig(({mode}) => {
           name: 'ICEPAB Nexus',
           short_name: 'Nexus',
           description: 'OAU Digital Nexus Application',
-          theme_color: '#ffffff',
+          theme_color: '#2563eb',
+          background_color: '#ffffff',
+          display: 'standalone',
+          orientation: 'portrait',
           icons: [
             {
               src: 'pwa-192x192.png',

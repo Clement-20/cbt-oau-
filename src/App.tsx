@@ -28,12 +28,14 @@ const About = lazy(() => import("./pages/About"));
 const Community = lazy(() => import("./pages/Community"));
 const Verification = lazy(() => import("./pages/Verification"));
 const Resources = lazy(() => import("./pages/Resources"));
+const StudyMode = lazy(() => import("./pages/StudyMode"));
 
 import { ErrorBoundary } from "./components/ErrorBoundary";
 import LoadingLogo from "./components/LoadingLogo";
 import Tutorial from "./components/Tutorial";
 import FloatingAI from "./components/FloatingAI";
 import ShareModal from "./components/ShareModal";
+import OfflineBanner from "./components/OfflineBanner";
 
 import BottomNav from "./nexus-features/BottomNav";
 
@@ -238,13 +240,33 @@ function MainApp() {
     );
   }
 
+  if (dbUser?.isBanned) {
+    return (
+      <div className="min-h-screen flex flex-col items-center justify-center bg-[var(--background)] text-[var(--foreground)] p-8 text-center">
+        <ShieldAlert size={64} className="text-red-500 mb-6 animate-pulse" />
+        <h1 className="text-4xl font-black tracking-tighter mb-4">ACCESS TERMINATED</h1>
+        <p className="text-xl text-[var(--foreground)]/60 max-w-md mb-8">
+          Your account has been restricted from the Digital Nexus due to a violation of our academic integrity or community guidelines.
+        </p>
+        <button 
+          onClick={logout}
+          className="bg-red-600 text-white px-8 py-3 rounded-full font-bold hover:bg-red-700 transition-colors"
+        >
+          Sign Out
+        </button>
+      </div>
+    );
+  }
+
   const navLinks = [
     { path: "/cbt", label: "CBT Engine" },
     { path: "/validate", label: "Validator" },
     { path: "/leaderboard", label: "Leaderboard" },
+    { path: "/study-mode", label: "Study Mode" },
     { path: "/resources", label: "Resources" },
     { path: "/community", label: "Community", icon: <Users size={14} /> },
     ...(isPaymentEnabled ? [{ path: "/verification", label: "Verify Student", icon: <BadgeCheck size={14} /> }] : []),
+    ...(user?.email === "banmekeifeoluwa@gmail.com" ? [{ path: "/admin-dashboard", label: "Admin", icon: <ShieldAlert size={14} /> }] : []),
     { path: "/about", label: "About", icon: <Zap size={14} /> },
   ];
 
@@ -322,11 +344,6 @@ function MainApp() {
                     <Flame size={14} fill="currentColor" /> {dbUser.currentStreak} Day Streak
                   </div>
                 )}
-                {user.email === "banmekeifeoluwa@gmail.com" && (
-                   <Link to="/icepab-admin" className="hidden sm:flex text-xs bg-red-500/10 text-red-600 dark:text-red-400 px-3 py-1.5 rounded-full items-center gap-1.5 font-bold border border-red-500/20 hover:bg-red-500/20 transition-colors">
-                     <ShieldAlert size={14} /> Admin
-                   </Link>
-                )}
                 <Link to="/profile" className="hidden sm:flex items-center gap-2 hover:bg-black/5 dark:hover:bg-white/10 p-1 pr-3 rounded-full transition-colors border border-transparent hover:border-[var(--border)]">
                   <img src={user.photoURL} alt="Avatar" loading="lazy" decoding="async" className="w-8 h-8 rounded-full border border-[var(--border)]" />
                   <span className="text-sm font-bold truncate max-w-[100px] flex items-center gap-1">
@@ -377,11 +394,6 @@ function MainApp() {
                 {link.icon} {link.label}
               </Link>
             ))}
-            {user?.email === "banmekeifeoluwa@gmail.com" && (
-              <Link to="/icepab-admin" onClick={() => setMobileMenuOpen(false)} className="p-3 rounded-xl text-red-500 flex items-center gap-3 bg-red-500/10">
-                <ShieldAlert size={18} /> Admin Dashboard
-              </Link>
-            )}
           </div>
         </div>
       )}
@@ -404,6 +416,7 @@ function MainApp() {
         <Suspense fallback={<LoadingFallback />}>
           <Routes>
             <Route path="/" element={<Home user={user} />} />
+            <Route path="/admin-dashboard" element={<Admin user={user} />} />
             <Route path="/icepab-admin" element={<Admin user={user} />} />
             <Route path="/cbt" element={<CBT user={user} isFocusMode={isFocusMode} setIsFocusMode={setIsFocusMode} />} />
             <Route path="/validate" element={<Validator user={user} />} />
@@ -416,6 +429,7 @@ function MainApp() {
             <Route path="/community" element={<Community user={user} />} />
             <Route path="/verification" element={<Verification user={user} />} />
             <Route path="/resources" element={<Resources user={user} />} />
+            <Route path="/study-mode" element={<StudyMode user={user} />} />
           </Routes>
         </Suspense>
       </main>
@@ -440,7 +454,7 @@ function MainApp() {
           {...shareData}
         />
       )}
-      {!isAIChatPage && <FloatingAI />}
+      {!isAIChatPage && !showStudyDeck && <FloatingAI />}
       {showStudyDeck && (
         <StudyDeck 
           user={user} 
@@ -454,6 +468,7 @@ function MainApp() {
         />
       )}
       <BottomNav />
+      <OfflineBanner />
       <Toast />
     </div>
   );

@@ -2,7 +2,8 @@ import React, { useState, useEffect } from "react";
 import { collection, addDoc, serverTimestamp, query, where, getDocs, updateDoc, doc, increment, deleteDoc, orderBy, limit, writeBatch } from "firebase/firestore";
 import { handleFirestoreError, OperationType } from "../utils/errorHandling";
 import { db } from "../firebase";
-import { ShieldAlert, Send, Search, BadgeCheck, Loader2, CheckCircle, Trash2, FileText, BookOpen, ShieldCheck } from "lucide-react";
+import { ShieldAlert, Send, Search, BadgeCheck, Loader2, CheckCircle, Trash2, FileText, BookOpen, ShieldCheck, Ban, UserMinus, UserPlus } from "lucide-react";
+import { clsx } from "clsx";
 import { Helmet } from "react-helmet-async";
 import { toast } from "../components/Toast";
 import ConfirmModal from "../components/ConfirmModal";
@@ -181,12 +182,27 @@ export default function Admin({ user }: { user: any }) {
     
     try {
       const userRef = doc(db, "users", searchResult.id);
-      await updateDoc(userRef, { isVerified: true });
-      setSearchResult({ ...searchResult, isVerified: true });
-      toast("User verified successfully!");
+      await updateDoc(userRef, { isVerified: !searchResult.isVerified });
+      setSearchResult({ ...searchResult, isVerified: !searchResult.isVerified });
+      toast(`User ${!searchResult.isVerified ? "verified" : "unverified"} successfully!`);
     } catch (error) {
       handleFirestoreError(error, OperationType.UPDATE, `users/${searchResult.id}`);
-      toast("Failed to verify user.");
+      toast("Failed to update verification status.");
+    }
+  };
+
+  const handleBanUser = async () => {
+    if (!searchResult) return;
+    const newBanStatus = !searchResult.isBanned;
+    
+    try {
+      const userRef = doc(db, "users", searchResult.id);
+      await updateDoc(userRef, { isBanned: newBanStatus });
+      setSearchResult({ ...searchResult, isBanned: newBanStatus });
+      toast(`User ${newBanStatus ? "banned" : "unbanned"} successfully!`);
+    } catch (error) {
+      handleFirestoreError(error, OperationType.UPDATE, `users/${searchResult.id}`);
+      toast("Failed to update ban status.");
     }
   };
 
@@ -438,18 +454,28 @@ export default function Admin({ user }: { user: any }) {
             </div>
             
             <div className="flex flex-col gap-2 items-end">
-              {!searchResult.isVerified ? (
+              <div className="flex gap-2">
                 <button
                   onClick={handleVerifyUser}
-                  className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-xl font-bold transition-colors flex items-center gap-2 text-sm w-full justify-center"
+                  className={clsx(
+                    "px-4 py-2 rounded-xl font-bold transition-colors flex items-center gap-2 text-sm",
+                    searchResult.isVerified ? "bg-emerald-500/10 text-emerald-600" : "bg-blue-600 text-white hover:bg-blue-700"
+                  )}
                 >
-                  <BadgeCheck size={16} /> Verify User
+                  <BadgeCheck size={16} /> {searchResult.isVerified ? "Verified" : "Verify User"}
                 </button>
-              ) : (
-                <span className="text-emerald-600 dark:text-emerald-400 font-bold text-sm bg-emerald-500/10 px-3 py-1 rounded-full">
-                  Verified
-                </span>
-              )}
+                
+                <button
+                  onClick={handleBanUser}
+                  className={clsx(
+                    "px-4 py-2 rounded-xl font-bold transition-colors flex items-center gap-2 text-sm",
+                    searchResult.isBanned ? "bg-red-600 text-white hover:bg-red-700" : "bg-red-500/10 text-red-600 hover:bg-red-500/20"
+                  )}
+                >
+                  {searchResult.isBanned ? <UserPlus size={16} /> : <Ban size={16} />} 
+                  {searchResult.isBanned ? "Unban" : "Ban User"}
+                </button>
+              </div>
               
               <button
                 onClick={() => {

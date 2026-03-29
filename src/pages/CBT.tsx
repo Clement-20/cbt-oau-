@@ -8,6 +8,7 @@ import { clsx } from "clsx";
 import HostTestModal from "../components/HostTestModal";
 import TestMetricsModal from "../components/TestMetricsModal";
 import Calculator from "../components/Calculator";
+import AITutor from "../nexus-features/AITutor";
 import { Helmet } from "react-helmet-async";
 import { toast } from "../components/Toast";
 import { Calculator as CalcIcon, HelpCircle } from "lucide-react";
@@ -48,13 +49,67 @@ export default function CBT({ user, isFocusMode, setIsFocusMode }: { user: any, 
   const [metricsTestTitle, setMetricsTestTitle] = useState<string>("");
   const [searchQuery, setSearchQuery] = useState("");
   const [searchHostedTestsQuery, setSearchHostedTestsQuery] = useState("");
-  const [questionLimit, setQuestionLimit] = useState<number>(10);
+  const [questionLimit, setQuestionLimit] = useState<number>(40);
   const [showCalculator, setShowCalculator] = useState(false);
   const [explanationPrompt, setExplanationPrompt] = useState("");
   const [isLoadingCourses, setIsLoadingCourses] = useState(true);
   const [isLoadingTests, setIsLoadingTests] = useState(true);
   const [userAnswers, setUserAnswers] = useState<(number | null)[]>([]);
   const [reviewIndex, setReviewIndex] = useState<number | null>(null);
+  const [timePerQuestion, setTimePerQuestion] = useState<number[]>([]);
+  const [lastQuestionTime, setLastQuestionTime] = useState<number>(0);
+
+  // Persistence Logic
+  useEffect(() => {
+    if (selectedCourse && !isFinished) {
+      const session = {
+        selectedCourse,
+        questions,
+        currentQuestionIndex,
+        userAnswers,
+        startTime,
+        timeLeft,
+        timePerQuestion,
+        lastQuestionTime,
+        currentHostedTestId,
+        currentHostId
+      };
+      localStorage.setItem("nexus_cbt_session", JSON.stringify(session));
+    }
+  }, [selectedCourse, currentQuestionIndex, userAnswers, timeLeft, isFinished]);
+
+  useEffect(() => {
+    const savedSession = localStorage.getItem("nexus_cbt_session");
+    if (savedSession && !selectedCourse) {
+      const session = JSON.parse(savedSession);
+      setSelectedCourse(session.selectedCourse);
+      setQuestions(session.questions);
+      setCurrentQuestionIndex(session.currentQuestionIndex);
+      setUserAnswers(session.userAnswers);
+      setStartTime(session.startTime);
+      setTimeLeft(session.timeLeft);
+      setTimePerQuestion(session.timePerQuestion || []);
+      setLastQuestionTime(session.lastQuestionTime || Date.now());
+      setCurrentHostedTestId(session.currentHostedTestId);
+      setCurrentHostId(session.currentHostId);
+    }
+  }, []);
+
+  const shuffle = <T,>(array: T[]): T[] => {
+    const newArray = [...array];
+    for (let i = newArray.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [newArray[i], newArray[j]] = [newArray[j], newArray[i]];
+    }
+    return newArray;
+  };
+
+  const shuffleQuestion = (q: Question): Question => {
+    const originalCorrectOption = q.options[q.correctAnswer];
+    const shuffledOptions = shuffle(q.options);
+    const newCorrectAnswer = shuffledOptions.indexOf(originalCorrectOption);
+    return { ...q, options: shuffledOptions, correctAnswer: newCorrectAnswer };
+  };
 
   useEffect(() => {
     if (user) {
@@ -206,11 +261,16 @@ export default function CBT({ user, isFocusMode, setIsFocusMode }: { user: any, 
       if (!course) return;
       
       const count = questionLimit;
-      const randomQs = [...course.questions].sort(() => 0.5 - Math.random()).slice(0, count);
-      setQuestions(randomQs);
+      const rawQs = [...course.questions].sort(() => 0.5 - Math.random()).slice(0, count);
+      const shuffledQs = rawQs.map(q => shuffleQuestion(q));
+      setQuestions(shuffledQs);
       setCurrentHostedTestId(null);
       setCurrentHostId(null);
-      setTimeLeft(count * 60);
+      
+      // 20 mins for 40 questions (30s per question)
+      // Otherwise 60s per question
+      const durationInSeconds = count === 40 ? 20 * 60 : count * 60;
+      setTimeLeft(durationInSeconds);
     }
     
     setSelectedCourse(courseCode);
@@ -220,19 +280,55 @@ export default function CBT({ user, isFocusMode, setIsFocusMode }: { user: any, 
     setSelectedOption(null);
     setShowResult(false);
     setStartTime(Date.now());
+    setLastQuestionTime(Date.now());
     setNewlyAwardedShana(false);
     setUserAnswers(new Array(hostedTest ? hostedTest.questions.length : questionLimit).fill(null));
+    setTimePerQuestion(new Array(hostedTest ? hostedTest.questions.length : questionLimit).fill(0));
     setReviewIndex(null);
   };
 
   const handleAnswer = (optionIndex: number) => {
+    const now = Date.now();
+    const timeSpentOnThisQ = Math.floor((now - lastQuestionTime) / 1000);
+    
+    const newTimePerQ = [...timePerQuestion];
+    newTimePerQ[currentQuestionIndex] = (newTimePerQ[currentQuestionIndex] || 0) + timeSpentOnThisQ;
+    setTimePerQuestion(newTimePerQ);
+    setLastQuestionTime(now);
+
     const newAnswers = [...userAnswers];
     newAnswers[currentQuestionIndex] = optionIndex;
     setUserAnswers(newAnswers);
     setSelectedOption(optionIndex);
   };
 
+  const nextQuestion = () => {
+    const now = Date.now();
+    const timeSpentOnThisQ = Math.floor((now - lastQuestionTime) / 1000);
+    const newTimePerQ = [...timePerQuestion];
+    newTimePerQ[currentQuestionIndex] = (newTimePerQ[currentQuestionIndex] || 0) + timeSpentOnThisQ;
+    setTimePerQuestion(newTimePerQ);
+    setLastQuestionTime(now);
+    setCurrentQuestionIndex(currentQuestionIndex + 1);
+  };
+
+  const prevQuestion = () => {
+    const now = Date.now();
+    const timeSpentOnThisQ = Math.floor((now - lastQuestionTime) / 1000);
+    const newTimePerQ = [...timePerQuestion];
+    newTimePerQ[currentQuestionIndex] = (newTimePerQ[currentQuestionIndex] || 0) + timeSpentOnThisQ;
+    setTimePerQuestion(newTimePerQ);
+    setLastQuestionTime(now);
+    setCurrentQuestionIndex(currentQuestionIndex - 1);
+  };
+
   const submitTest = async () => {
+    const now = Date.now();
+    const timeSpentOnThisQ = Math.floor((now - lastQuestionTime) / 1000);
+    const newTimePerQ = [...timePerQuestion];
+    newTimePerQ[currentQuestionIndex] = (newTimePerQ[currentQuestionIndex] || 0) + timeSpentOnThisQ;
+    setTimePerQuestion(newTimePerQ);
+
     let finalScore = 0;
     questions.forEach((q, idx) => {
       if (userAnswers[idx] === q.correctAnswer) {
@@ -241,6 +337,7 @@ export default function CBT({ user, isFocusMode, setIsFocusMode }: { user: any, 
     });
     setScore(finalScore);
     setIsFinished(true);
+    localStorage.removeItem("nexus_cbt_session");
 
     if (user) {
       try {
@@ -343,6 +440,17 @@ export default function CBT({ user, isFocusMode, setIsFocusMode }: { user: any, 
     else if (percentage >= 50) { grade = "Average"; gradeColor = "text-amber-500"; }
     else if (percentage >= 40) { grade = "Fair"; gradeColor = "text-orange-500"; }
 
+    // Analytics: Topic Breakdown
+    const topicStats: { [key: string]: { correct: number, total: number } } = {};
+    questions.forEach((q, idx) => {
+      const topic = q.topic || "General";
+      if (!topicStats[topic]) topicStats[topic] = { correct: 0, total: 0 };
+      topicStats[topic].total++;
+      if (userAnswers[idx] === q.correctAnswer) topicStats[topic].correct++;
+    });
+
+    const averageTime = timePerQuestion.reduce((a, b) => a + b, 0) / questions.length;
+
     return (
       <div className="max-w-3xl mx-auto space-y-8">
         <div className="glass-panel text-center py-10 rounded-3xl p-10 relative overflow-hidden space-y-6">
@@ -364,12 +472,40 @@ export default function CBT({ user, isFocusMode, setIsFocusMode }: { user: any, 
               <p className="text-2xl font-bold">{percentage.toFixed(1)}%</p>
             </div>
             <div className="p-4 bg-black/5 dark:bg-white/5 rounded-2xl">
-              <p className="text-xs text-[var(--foreground)]/50 uppercase font-bold mb-1">Grade</p>
-              <p className={`text-2xl font-bold ${gradeColor}`}>{grade}</p>
+              <p className="text-xs text-[var(--foreground)]/50 uppercase font-bold mb-1">Avg Time/Q</p>
+              <p className="text-2xl font-bold">{averageTime.toFixed(1)}s</p>
             </div>
             <div className="p-4 bg-black/5 dark:bg-white/5 rounded-2xl">
               <p className="text-xs text-[var(--foreground)]/50 uppercase font-bold mb-1">XP Earned</p>
               <p className="text-2xl font-bold text-amber-500">+{score * 10 + 5}</p>
+            </div>
+          </div>
+
+          {/* Topic Breakdown */}
+          <div className="space-y-4 text-left">
+            <h3 className="text-lg font-bold flex items-center gap-2">
+              <Activity size={20} className="text-blue-500" /> Topic Performance
+            </h3>
+            <div className="grid gap-3">
+              {Object.entries(topicStats).map(([topic, stats]) => {
+                const topicPerc = (stats.correct / stats.total) * 100;
+                return (
+                  <div key={topic} className="bg-black/5 dark:bg-white/5 p-4 rounded-2xl border border-[var(--border)]">
+                    <div className="flex justify-between items-center mb-2">
+                      <span className="font-bold text-sm">{topic}</span>
+                      <span className={clsx("text-xs font-black", topicPerc >= 70 ? "text-emerald-500" : topicPerc >= 40 ? "text-amber-500" : "text-red-500")}>
+                        {stats.correct}/{stats.total} ({topicPerc.toFixed(0)}%)
+                      </span>
+                    </div>
+                    <div className="w-full h-2 bg-black/10 dark:bg-white/10 rounded-full overflow-hidden">
+                      <div 
+                        className={clsx("h-full transition-all duration-1000", topicPerc >= 70 ? "bg-emerald-500" : topicPerc >= 40 ? "bg-amber-500" : "bg-red-500")}
+                        style={{ width: `${topicPerc}%` }}
+                      />
+                    </div>
+                  </div>
+                );
+              })}
             </div>
           </div>
 
@@ -423,6 +559,16 @@ export default function CBT({ user, isFocusMode, setIsFocusMode }: { user: any, 
                     </div>
                   );
                 })}
+              </div>
+              <div className="mt-4 p-3 bg-blue-500/5 rounded-xl border border-blue-500/10 flex justify-between items-center">
+                <span className="text-xs font-bold text-blue-600">Time spent: {timePerQuestion[reviewIndex]}s</span>
+                <AITutor 
+                  question={questions[reviewIndex].question}
+                  options={questions[reviewIndex].options}
+                  correctAnswer={questions[reviewIndex].options[questions[reviewIndex].correctAnswer]}
+                  isVerified={isVerified}
+                  isVisible={true}
+                />
               </div>
             </div>
           )}
@@ -483,6 +629,13 @@ export default function CBT({ user, isFocusMode, setIsFocusMode }: { user: any, 
 
     return (
       <div className="max-w-3xl mx-auto space-y-8 relative">
+        <AITutor 
+          question={q.question}
+          options={q.options}
+          correctAnswer={q.options[q.correctAnswer]}
+          isVerified={isVerified}
+          isVisible={userAnswers[currentQuestionIndex] !== null}
+        />
         <div className="flex justify-between items-center glass-panel p-5 rounded-2xl">
           <div className="font-bold text-lg tracking-tight">{selectedCourse}</div>
           <div className="flex items-center gap-2">
@@ -553,7 +706,7 @@ export default function CBT({ user, isFocusMode, setIsFocusMode }: { user: any, 
 
         <div className="flex justify-between items-center gap-4">
           <button
-            onClick={() => setCurrentQuestionIndex(Math.max(0, currentQuestionIndex - 1))}
+            onClick={prevQuestion}
             disabled={currentQuestionIndex === 0}
             className="flex-1 bg-black/5 dark:bg-white/10 hover:bg-black/10 dark:hover:bg-white/20 text-[var(--foreground)] py-4 rounded-2xl font-bold transition-all disabled:opacity-30"
           >
@@ -561,7 +714,7 @@ export default function CBT({ user, isFocusMode, setIsFocusMode }: { user: any, 
           </button>
           {currentQuestionIndex < questions.length - 1 ? (
             <button
-              onClick={() => setCurrentQuestionIndex(currentQuestionIndex + 1)}
+              onClick={nextQuestion}
               className="flex-1 bg-blue-600 hover:bg-blue-700 text-white py-4 rounded-2xl font-bold transition-all shadow-md"
             >
               Next
@@ -739,6 +892,7 @@ export default function CBT({ user, isFocusMode, setIsFocusMode }: { user: any, 
             <option value={5}>5</option>
             <option value={10}>10</option>
             <option value={20}>20</option>
+            <option value={40}>40</option>
             <option value={50}>50</option>
           </select>
         </div>

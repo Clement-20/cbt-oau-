@@ -4,14 +4,28 @@ service cloud.firestore {
     // ===============================================================
     // Helper Functions
     // ===============================================================
-    function isAuthenticated() { return request.auth != null; }
-    function isOwner(userId) { return isAuthenticated() && request.auth.uid == userId; }
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isNotBanned() {
+      let userPath = /databases/$(database)/documents/users/$(request.auth.uid);
+      // If the doc doesn't exist, they aren't banned yet.
+      return isSignedIn() && (!exists(userPath) || get(userPath).data.get('isBanned', false) == false);
+    }
+
+    function isAuthenticated() {
+      return isSignedIn() && isNotBanned();
+    }
+
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId && isNotBanned();
+    }
+
     function isAdmin() {
-      let userDoc = get(/databases/$(database)/documents/users/$(request.auth.uid));
-      return isAuthenticated() && (
-        (userDoc.data != null && userDoc.data.role == 'admin') ||
-        (request.auth.token.email == "banmekeifeoluwa@gmail.com" && request.auth.token.email_verified == true)
-      );
+      let isDefaultAdmin = request.auth.token.email == "banmekeifeoluwa@gmail.com" && request.auth.token.email_verified == true;
+      let userPath = /databases/$(database)/documents/users/$(request.auth.uid);
+      return isSignedIn() && (isDefaultAdmin || (exists(userPath) && get(userPath).data.get('role', '') == 'admin'));
     }
     function hasRequiredFields(fields) { return request.resource.data.keys().hasAll(fields); }
     function hasOnlyAllowedFields(fields) { return request.resource.data.keys().hasOnly(fields); }
@@ -36,16 +50,23 @@ service cloud.firestore {
     }
 
     match /courses/{courseId} {
-      allow read: if isAuthenticated();
+      allow read: if isAuthenticated() || isAdmin();
       allow create: if isAuthenticated() && hasRequiredFields(['title', 'questions']) && hasOnlyAllowedFields(['title', 'questions', 'description']);
       allow update: if isAuthenticated() && hasOnlyAllowedFields(['title', 'questions', 'description']);
       allow delete: if isAdmin();
     }
 
     match /users/{userId} {
-      allow read: if isAuthenticated();
-      allow create: if isOwner(userId) && hasRequiredFields(['role']) && (request.resource.data.role == 'student' || request.resource.data.role == 'guest');
-      allow update: if isOwner(userId) || isAdmin();
+      // Allow reading own doc to check status/login (avoids recursion)
+      allow read: if isSignedIn() && (request.auth.uid == userId || isAdmin());
+      allow create: if isSignedIn() && request.auth.uid == userId && 
+                    hasRequiredFields(['role']) && 
+                    (request.resource.data.role == 'student' || request.resource.data.role == 'guest') &&
+                    !('isVerified' in request.resource.data) &&
+                    !('isBanned' in request.resource.data);
+      allow update: if (isOwner(userId) && 
+                      areImmutableFieldsUnchanged(['role', 'isVerified', 'isBanned', 'uid', 'email', 'createdAt'])) || 
+                    isAdmin();
       
       match /private/{document=**} {
         allow read, write: if isOwner(userId);
@@ -53,7 +74,7 @@ service cloud.firestore {
     }
 
     match /broadcasts/{broadcastId} {
-      allow read: if isAuthenticated();
+      allow read: if isAuthenticated() || isAdmin();
       allow create: if isAdmin() || (isAuthenticated() && request.resource.data.type == 'achievement' && hasRequiredFields(['message', 'timestamp', 'type']));
       allow update, delete: if isAdmin();
     }
@@ -115,7 +136,7 @@ service cloud.firestore {
     }
 
     match /resources/{resourceId} {
-      allow read: if isAuthenticated();
+      allow read: if isAuthenticated() || isAdmin();
       allow create: if isAuthenticated() && hasRequiredFields(['userId', 'url', 'title', 'type', 'course']) && isValidUrl('url') && hasOnlyAllowedFields(['title', 'type', 'url', 'course', 'uploadedBy', 'userId', 'fileHash', 'timestamp', 'uploaderVerified', 'likes', 'dislikes']);
       allow update: if isAuthenticated() && (
         isAdmin() || 

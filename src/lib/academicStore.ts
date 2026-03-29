@@ -5,10 +5,12 @@ interface AcademicState {
   followedUploaders: string[]; // Array of userIds
   likedResources: string[]; // Array of resourceIds
   dislikedResources: string[]; // Array of resourceIds
+  aiExplanationsUsed: number;
   followUploader: (userId: string) => void;
   unfollowUploader: (userId: string) => void;
   toggleLike: (resourceId: string) => void;
   toggleDislike: (resourceId: string) => void;
+  incrementAIUsage: () => void;
 }
 
 export const useAcademicStore = create<AcademicState>()(
@@ -17,6 +19,7 @@ export const useAcademicStore = create<AcademicState>()(
       followedUploaders: [],
       likedResources: [],
       dislikedResources: [],
+      aiExplanationsUsed: 0,
       followUploader: (userId) => 
         set((state) => ({ 
           followedUploaders: state.followedUploaders.includes(userId) 
@@ -49,6 +52,8 @@ export const useAcademicStore = create<AcademicState>()(
             likedResources: state.likedResources.filter(id => id !== resourceId)
           };
         }),
+      incrementAIUsage: () => 
+        set((state) => ({ aiExplanationsUsed: state.aiExplanationsUsed + 1 })),
     }),
     {
       name: 'nexus-academic-store',
