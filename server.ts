@@ -3,7 +3,7 @@ import { createServer as createViteServer } from "vite";
 import path from "path";
 import compression from "compression";
 import axios from "axios";
-import { courses } from "./src/lib/questions";
+import { courses } from "./src/lib/questions.ts";
 
 async function startServer() {
   const app = express();

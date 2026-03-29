@@ -5,11 +5,11 @@ import { Helmet } from "react-helmet-async";
 import { toast } from "../components/Toast";
 
 const aroTemplates = [
-  "Just smashed my CBT on ICEPAB Nexus. 100% accuracy. You're still sleeping? ❄️🧊",
-  "My brain is currently operating at 5.0 GPA capacity thanks to ICEPAB Nexus. Catch up! 🚀",
-  "They said GST 111 was hard. ICEPAB Nexus made it a breeze. We dominate! 💯",
-  "Study time: Max. Distractions: Zero. ICEPAB Nexus is the ultimate cheat code. 🧠⚡",
-  "If you're not on ICEPAB Nexus, you're playing academic catch-up. Stay frosty! ❄️",
+  "Just smashed my CBT on Digital Nexus. 100% accuracy. You're still sleeping? ❄️🧊",
+  "My brain is currently operating at 5.0 GPA capacity thanks to Digital Nexus. Catch up! 🚀",
+  "They said GST 111 was hard. Digital Nexus made it a breeze. We dominate! 💯",
+  "Study time: Max. Distractions: Zero. Digital Nexus is the ultimate cheat code. 🧠⚡",
+  "If you're not on Digital Nexus, you're playing academic catch-up. Stay frosty! ❄️",
   "Just validated 50 questions on the Nexus. Call me the Academic Overlord. 👑📚"
 ];
 
@@ -31,7 +31,7 @@ export default function Aro({ user }: { user: any }) {
   };
 
   const shareToWhatsApp = () => {
-    const text = `*ICEPAB Nexus Aro:*\n\n"${currentAro}"\n\nGenerated via OAU Digital Nexus ❄️`;
+    const text = `*Digital Nexus Aro:*\n\n"${currentAro}"\n\nGenerated via OAU Digital Nexus ❄️`;
     window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, '_blank');
   };
 
@@ -65,8 +65,8 @@ export default function Aro({ user }: { user: any }) {
   return (
     <div className="max-w-4xl mx-auto space-y-8">
       <Helmet>
-        <title>Aro Generator | ICEPAB Nexus</title>
-        <meta name="description" content="Generate premium shareable hype for your WhatsApp status with the ICEPAB Nexus Aro Generator." />
+        <title>Aro Generator | Digital Nexus</title>
+        <meta name="description" content="Generate premium shareable hype for your WhatsApp status with the Digital Nexus Aro Generator." />
       </Helmet>
       <div>
         <h1 className="text-3xl font-bold tracking-tighter flex items-center gap-3">

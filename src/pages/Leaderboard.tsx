@@ -2,7 +2,7 @@ import React, { useEffect, useState } from "react";
 import { collection, query, orderBy, limit, onSnapshot } from "firebase/firestore";
 import { handleFirestoreError, OperationType } from "../utils/errorHandling";
 import { db } from "../firebase";
-import { Trophy, Medal, Award, Flame } from "lucide-react";
+import { Trophy, Medal, Award, Flame, Share2 } from "lucide-react";
 import NexusBadge from "../components/NexusBadge";
 import { Helmet } from "react-helmet-async";
 
@@ -58,14 +58,32 @@ export default function Leaderboard({ user }: { user: any }) {
   return (
     <div className="max-w-3xl mx-auto space-y-8">
       <Helmet>
-        <title>Leaderboard | ICEPAB Nexus</title>
-        <meta name="description" content="View the top-performing OAU students on the ICEPAB Nexus Leaderboard." />
+        <title>Leaderboard | Digital Nexus</title>
+        <meta name="description" content="View the top-performing OAU students on the Digital Nexus Leaderboard." />
       </Helmet>
-      <div>
-        <h1 className="text-3xl font-bold tracking-tighter flex items-center gap-3">
-          <Trophy className="text-amber-500" /> Leaderboard
-        </h1>
-        <p className="text-[var(--foreground)]/60 mt-2 font-medium">Real-time rankings based on Study Time & CBT performance.</p>
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div>
+          <h1 className="text-3xl font-bold tracking-tighter flex items-center gap-3">
+            <Trophy className="text-amber-500" /> Leaderboard
+          </h1>
+          <p className="text-[var(--foreground)]/60 mt-2 font-medium">Real-time rankings based on Study Time & CBT performance.</p>
+        </div>
+        <button 
+          onClick={() => {
+            const topStudent = leaders[0]?.displayName || "the top students";
+            const text = `Check out the Digital Nexus Leaderboard! ${topStudent} is currently leading. 🏆 Can you climb to the top?`;
+            window.dispatchEvent(new CustomEvent("open-share-modal", {
+              detail: {
+                title: "Nexus Leaderboard",
+                text: text,
+                url: window.location.origin
+              }
+            }));
+          }}
+          className="flex items-center justify-center gap-2 bg-emerald-500 hover:bg-emerald-600 text-white px-5 py-3 rounded-xl font-bold transition-all shadow-md shrink-0"
+        >
+          <Share2 size={18} /> Share Leaderboard
+        </button>
       </div>
 
       <div className="glass-panel rounded-3xl overflow-hidden">

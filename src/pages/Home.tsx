@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { getRandomMotivation } from "../lib/motivations";
-import { Activity, Zap, ShieldCheck, Trophy, BookOpen, BellRing } from "lucide-react";
+import { Activity, Zap, ShieldCheck, Trophy, BookOpen, BellRing, Share2, Calculator } from "lucide-react";
 import { Link } from "react-router-dom";
 import { motion } from "motion/react";
 import { collection, onSnapshot, query, orderBy, limit } from "firebase/firestore";
@@ -98,8 +98,8 @@ export default function Home({ user }: { user: any }) {
   return (
     <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="space-y-8">
       <Helmet>
-        <title>Home | ICEPAB Nexus - OAU Student Super-App</title>
-        <meta name="description" content="Welcome to ICEPAB Nexus, the ultimate OAU student super-app. Practice OAU CBT GST 111, use the OAU CGPA Calculator, and access OAU student resources." />
+        <title>Home | Digital Nexus - OAU Student Super-App</title>
+        <meta name="description" content="Welcome to Digital Nexus, the ultimate OAU student super-app. Practice OAU CBT GST 111, use the OAU CGPA Calculator, and access OAU student resources." />
         <meta name="keywords" content="OAU CBT GST 111, OAU CGPA Calculator, OAU Freshers Guide, Obafemi Awolowo University, ICEPAB, OAU student portal, OAU E-Portal, Great Ife, OAU Nexus" />
         <link rel="canonical" href={`${import.meta.env.NEXT_PUBLIC_BASE_URL || 'https://icepab-nexus.run.app'}/`} />
         <script type="application/ld+json">
@@ -107,7 +107,7 @@ export default function Home({ user }: { user: any }) {
             {
               "@context": "https://schema.org",
               "@type": "WebSite",
-              "name": "ICEPAB Nexus",
+              "name": "Digital Nexus",
               "url": "${import.meta.env.NEXT_PUBLIC_BASE_URL || 'https://icepab-nexus.run.app'}",
               "description": "The ultimate OAU student super-app. Practice OAU CBT GST 111, use the OAU CGPA Calculator, and read the OAU Freshers Guide.",
               "potentialAction": {
@@ -152,9 +152,16 @@ export default function Home({ user }: { user: any }) {
           </div>
           <div className="relative z-10">
             <h1 className="text-4xl md:text-5xl font-bold tracking-tighter mb-2">
-              Digital <span className="text-blue-600 dark:text-blue-500">Nexus</span>
+              Digital Nexus
             </h1>
             <p className="text-[var(--foreground)]/60 mb-8 font-medium">The OAU Campus OS. Practice, Validate, Dominate.</p>
+            
+            <button 
+              onClick={() => window.dispatchEvent(new CustomEvent("open-share-modal"))}
+              className="flex items-center gap-2 bg-emerald-500 hover:bg-emerald-600 text-white px-6 py-3 rounded-2xl font-bold transition-all shadow-lg hover:scale-105 mb-8"
+            >
+              <Share2 size={20} /> Share Nexus
+            </button>
           </div>
           
           <div className="space-y-4 relative z-10">
@@ -204,14 +211,19 @@ export default function Home({ user }: { user: any }) {
       </div>
 
       {/* Quick Links Grid */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4">
         <Link to="/cbt" className="glass-panel hover:bg-black/5 dark:hover:bg-white/10 p-6 rounded-3xl transition-all group">
           <BookOpen className="text-blue-600 dark:text-blue-400 mb-4 group-hover:scale-110 transition-transform" size={32} />
           <h3 className="text-lg font-bold mb-2">CBT Engine</h3>
           <p className="text-sm text-[var(--foreground)]/60 font-medium">Practice exams for GST 111, BUS 101, and more.</p>
         </Link>
+        <Link to="/gpa" className="glass-panel hover:bg-black/5 dark:hover:bg-white/10 p-6 rounded-3xl transition-all group">
+          <Calculator className="text-emerald-600 dark:text-emerald-400 mb-4 group-hover:scale-110 transition-transform" size={32} />
+          <h3 className="text-lg font-bold mb-2">CGPA Calc</h3>
+          <p className="text-sm text-[var(--foreground)]/60 font-medium">Advanced OAU CGPA Calculator & Predictor.</p>
+        </Link>
         <Link to="/validate" className="glass-panel hover:bg-black/5 dark:hover:bg-white/10 p-6 rounded-3xl transition-all group">
-          <ShieldCheck className="text-emerald-600 dark:text-emerald-400 mb-4 group-hover:scale-110 transition-transform" size={32} />
+          <ShieldCheck className="text-blue-600 dark:text-blue-400 mb-4 group-hover:scale-110 transition-transform" size={32} />
           <h3 className="text-lg font-bold mb-2">Validator</h3>
           <p className="text-sm text-[var(--foreground)]/60 font-medium">Crowdsource and verify new course questions.</p>
         </Link>

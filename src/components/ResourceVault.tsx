@@ -1,54 +1,122 @@
-import React, { useState, useEffect, useRef } from "react";
-import { Upload, FileText, Download, Search, Trash2, X, Loader2 } from "lucide-react";
-import { collection, onSnapshot, query, orderBy, addDoc, serverTimestamp, deleteDoc, doc, getDocs, where } from "firebase/firestore";
+import React, { useState, useEffect, useRef, useMemo } from "react";
+import { Upload, FileText, Download, Search, Trash2, X, Loader2, ThumbsUp, ThumbsDown, UserPlus, UserMinus, Filter, ChevronDown, BookOpen, Clock, Star, ExternalLink, Image as ImageIcon, File as FileIcon, User } from "lucide-react";
+import { collection, onSnapshot, query, orderBy, addDoc, serverTimestamp, deleteDoc, doc, getDocs, where, updateDoc, increment, limit, startAfter, getDoc, QueryDocumentSnapshot } from "firebase/firestore";
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
-import { db, storage } from "../firebase";
+import { db, storage, auth } from "../firebase";
 import { toast } from "./Toast";
 import ConfirmModal from "./ConfirmModal";
 import { handleFirestoreError, OperationType } from "../utils/errorHandling";
+import { useAcademicStore } from "../lib/academicStore";
+import { motion, AnimatePresence } from "motion/react";
+
+import { FeedSkeleton } from "../nexus-features/SkeletonLoader";
 
 interface Resource {
   id: string;
   title: string;
-  type: "PDF" | "Link";
+  type: "PDF" | "Image" | "Link";
   url: string;
   course: string;
   uploadedBy: string;
+  userId: string;
+  uploaderVerified?: boolean;
+  likes: number;
+  dislikes: number;
   fileHash?: string;
   timestamp?: any;
+  qualityScore?: number;
 }
 
-async function computeFileHash(file: File): Promise<string> {
-  const arrayBuffer = await file.arrayBuffer();
-  const hashBuffer = await crypto.subtle.digest('SHA-256', arrayBuffer);
-  const hashArray = Array.from(new Uint8Array(hashBuffer));
-  return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
-}
-
-export default function ResourceVault({ user, isAdmin }: { user?: any, isAdmin?: boolean }) {
+export default function ResourceMarketplace({ user, isAdmin }: { user?: any, isAdmin?: boolean }) {
   const [resources, setResources] = useState<Resource[]>([]);
   const [search, setSearch] = useState("");
   const [showUpload, setShowUpload] = useState(false);
-  const [newResource, setNewResource] = useState<{title: string, type: "PDF" | "Link", url: string, course: string}>({ title: "", type: "PDF", url: "", course: "" });
+  const [activeTab, setActiveTab] = useState<"feed" | "my-uploads">("feed");
+  const [newResource, setNewResource] = useState<{title: string, type: "PDF" | "Image" | "Link", url: string, course: string}>({ title: "", type: "PDF", url: "", course: "" });
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [isUploading, setIsUploading] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
+  const [lastDoc, setLastDoc] = useState<QueryDocumentSnapshot | null>(null);
+  const [hasMore, setHasMore] = useState(true);
+  const [userCourses, setUserCourses] = useState<string[]>([]);
   const [deleteId, setDeleteId] = useState<string | null>(null);
+  
+  const { followedUploaders, likedResources, dislikedResources, followUploader, unfollowUploader, toggleLike, toggleDislike } = useAcademicStore();
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  // Fetch user's CGPA courses for personalization
   useEffect(() => {
     if (!user) return;
-    const q = query(collection(db, "resources"), orderBy("timestamp", "desc"));
-    const unsubscribe = onSnapshot(q, (snapshot) => {
+    const fetchUserCourses = async () => {
+      try {
+        const cgpaDoc = await getDoc(doc(db, "user_cgpa", user.uid));
+        if (cgpaDoc.exists()) {
+          const data = cgpaDoc.data();
+          const codes = (data.courses || []).map((c: any) => c.code.toUpperCase());
+          setUserCourses(codes);
+        }
+      } catch (error) {
+        console.error("Failed to fetch user courses", error);
+      }
+    };
+    fetchUserCourses();
+  }, [user]);
+
+  // Initial fetch
+  useEffect(() => {
+    if (!user) return;
+    fetchResources(true);
+  }, [user, activeTab]);
+
+  const fetchResources = async (isInitial: boolean = false) => {
+    if (!user) return;
+    setIsLoading(true);
+    try {
+      let q;
+      if (activeTab === "my-uploads") {
+        q = query(
+          collection(db, "resources"), 
+          where("userId", "==", user.uid),
+          orderBy("timestamp", "desc"),
+          limit(10)
+        );
+      } else {
+        q = query(
+          collection(db, "resources"), 
+          orderBy("timestamp", "desc"),
+          limit(10)
+        );
+      }
+
+      if (!isInitial && lastDoc) {
+        q = query(q, startAfter(lastDoc));
+      }
+
+      const snapshot = await getDocs(q);
       const fetched: Resource[] = [];
       snapshot.forEach((doc) => {
-        fetched.push({ id: doc.id, ...doc.data() } as Resource);
+        const data = doc.data() as Omit<Resource, "id" | "qualityScore">;
+        const likes = data.likes || 0;
+        const dislikes = data.dislikes || 0;
+        const uploaderVerified = data.uploaderVerified || false;
+        const qualityScore = likes - dislikes + (uploaderVerified ? 10 : 0);
+        fetched.push({ id: doc.id, ...data, qualityScore } as Resource);
       });
-      setResources(fetched);
-    }, (error) => {
+
+      if (isInitial) {
+        setResources(fetched);
+      } else {
+        setResources(prev => [...prev, ...fetched]);
+      }
+
+      setLastDoc(snapshot.docs[snapshot.docs.length - 1] || null);
+      setHasMore(snapshot.docs.length === 10);
+    } catch (error) {
       handleFirestoreError(error, OperationType.GET, "resources");
-    });
-    return () => unsubscribe();
-  }, [user]);
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   const handleUpload = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -60,43 +128,40 @@ export default function ResourceVault({ user, isAdmin }: { user?: any, isAdmin?:
       toast("Please fill all required fields");
       return;
     }
-    if (newResource.type === "Link" && !newResource.url) {
-      toast("Please provide a valid URL");
-      return;
-    }
-    if (newResource.type === "PDF" && !selectedFile) {
-      toast("Please select a PDF file to upload");
-      return;
-    }
-    if (newResource.type === "PDF" && selectedFile && selectedFile.size > 10 * 1024 * 1024) {
-      toast("File size must be less than 10MB");
+    if ((newResource.type === "PDF" || newResource.type === "Image") && !selectedFile) {
+      toast(`Please select a ${newResource.type} file to upload`);
       return;
     }
 
     setIsUploading(true);
     try {
-      let finalUrl = newResource.url;
-      let fileHash = "";
-
-      if (newResource.type === "PDF" && selectedFile) {
-        // 1. Compute Hash
-        fileHash = await computeFileHash(selectedFile);
-
-        // 2. Check for duplicates
-        const duplicateQuery = query(collection(db, "resources"), where("fileHash", "==", fileHash));
-        const duplicateSnap = await getDocs(duplicateQuery);
+      let finalUrl = "";
+      
+      if (newResource.type === "Image" && selectedFile) {
+        // Cloudinary Direct Upload
+        const formData = new FormData();
+        formData.append("file", selectedFile);
+        formData.append("upload_preset", "nexus_unsigned"); // User must configure this
         
-        if (!duplicateSnap.empty) {
-          toast("This exact material has already been uploaded to the vault.");
-          setIsUploading(false);
-          return;
-        }
-
-        // 3. Upload to Storage
-        const storageRef = ref(storage, `resources/${fileHash}_${selectedFile.name}`);
+        const response = await fetch(`https://api.cloudinary.com/v1_1/digital-nexus/image/upload`, {
+          method: "POST",
+          body: formData
+        });
+        
+        if (!response.ok) throw new Error("Cloudinary upload failed");
+        const data = await response.json();
+        finalUrl = data.secure_url;
+      } else if (newResource.type === "PDF" && selectedFile) {
+        // Firebase Storage Upload
+        const storageRef = ref(storage, `resources/${user.uid}_${Date.now()}_${selectedFile.name}`);
         await uploadBytes(storageRef, selectedFile);
         finalUrl = await getDownloadURL(storageRef);
+      } else {
+        finalUrl = newResource.url;
       }
+
+      const userDoc = await getDoc(doc(db, "users", user.uid));
+      const uploaderVerified = userDoc.exists() ? userDoc.data().isVerified : false;
 
       await addDoc(collection(db, "resources"), {
         title: newResource.title,
@@ -105,15 +170,17 @@ export default function ResourceVault({ user, isAdmin }: { user?: any, isAdmin?:
         course: newResource.course.toUpperCase(),
         uploadedBy: user.displayName || "Anonymous",
         userId: user.uid,
-        ...(fileHash && { fileHash }),
+        uploaderVerified,
+        likes: 0,
+        dislikes: 0,
         timestamp: serverTimestamp()
       });
       
       setNewResource({ title: "", type: "PDF", url: "", course: "" });
       setSelectedFile(null);
-      if (fileInputRef.current) fileInputRef.current.value = "";
       setShowUpload(false);
-      toast("Resource uploaded successfully!");
+      toast("Resource added to the marketplace! 🚀");
+      fetchResources(true);
     } catch (error) {
       handleFirestoreError(error, OperationType.CREATE, "resources");
       toast("Failed to upload resource");
@@ -122,179 +189,404 @@ export default function ResourceVault({ user, isAdmin }: { user?: any, isAdmin?:
     }
   };
 
-  const handleDelete = async (id: string) => {
+  const handleSocialAction = async (resourceId: string, action: "like" | "dislike") => {
+    if (!user) return toast("Sign in to interact");
+    
+    const isLiked = likedResources.includes(resourceId);
+    const isDisliked = dislikedResources.includes(resourceId);
+
     try {
-      await deleteDoc(doc(db, "resources", id));
-      toast("Resource deleted");
+      const docRef = doc(db, "resources", resourceId);
+      
+      if (action === "like") {
+        if (isLiked) {
+          await updateDoc(docRef, { likes: increment(-1) });
+        } else {
+          await updateDoc(docRef, { 
+            likes: increment(1),
+            ...(isDisliked && { dislikes: increment(-1) })
+          });
+        }
+        toggleLike(resourceId);
+      } else {
+        if (isDisliked) {
+          await updateDoc(docRef, { dislikes: increment(-1) });
+        } else {
+          await updateDoc(docRef, { 
+            dislikes: increment(1),
+            ...(isLiked && { likes: increment(-1) })
+          });
+        }
+        toggleDislike(resourceId);
+      }
     } catch (error) {
-      handleFirestoreError(error, OperationType.DELETE, `resources/${id}`);
-      toast("Failed to delete resource");
+      console.error("Social action failed", error);
     }
   };
 
-  const filteredResources = resources.filter(r => 
-    r.title.toLowerCase().includes(search.toLowerCase()) || 
-    r.course.toLowerCase().includes(search.toLowerCase())
-  );
+  const filteredAndSortedResources = useMemo(() => {
+    let filtered = resources.filter(r => {
+      const searchTerm = search.toLowerCase();
+      return (
+        r.title.toLowerCase().includes(searchTerm) || 
+        r.course.toLowerCase().includes(searchTerm) ||
+        r.uploadedBy.toLowerCase().includes(searchTerm)
+      );
+    });
+
+    if (activeTab === "feed") {
+      // Prioritize user's courses and then by quality score
+      return filtered.sort((a, b) => {
+        const aInUserCourses = userCourses.includes(a.course) ? 1 : 0;
+        const bInUserCourses = userCourses.includes(b.course) ? 1 : 0;
+        
+        if (aInUserCourses !== bInUserCourses) {
+          return bInUserCourses - aInUserCourses;
+        }
+        
+        return (b.qualityScore || 0) - (a.qualityScore || 0);
+      });
+    }
+
+    return filtered;
+  }, [resources, search, userCourses, activeTab]);
 
   return (
-    <div className="w-full max-w-4xl mx-auto">
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
-        <h3 className="font-bold text-2xl text-cyan-600 dark:text-cyan-400 flex items-center gap-2">
-          <FileText className="text-cyan-600 dark:text-cyan-500" /> The Vault
-        </h3>
-        
-        <div className="flex gap-2 w-full md:w-auto">
-          <div className="relative flex-1 md:w-64">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--foreground)]/50" size={18} />
+    <div className="w-full max-w-5xl mx-auto px-4 pb-24">
+      {/* Header & Search */}
+      <div className="flex flex-col gap-6 mb-8">
+        <div className="flex justify-between items-center">
+          <div>
+            <h1 className="text-3xl font-black tracking-tighter flex items-center gap-2">
+              <Star className="text-amber-500 fill-amber-500" /> Resource Marketplace
+            </h1>
+            <p className="text-sm text-[var(--foreground)]/50 font-medium">Smart materials for the Digital Nexus ecosystem.</p>
+          </div>
+          <button 
+            onClick={() => setShowUpload(true)}
+            className="bg-cyan-600 hover:bg-cyan-700 text-white px-6 py-3 rounded-2xl font-bold flex items-center gap-2 shadow-lg shadow-cyan-500/20 transition-all active:scale-95"
+          >
+            <Upload size={20} /> Upload
+          </button>
+        </div>
+
+        <div className="flex flex-col md:flex-row gap-4">
+          <div className="relative flex-1">
+            <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-[var(--foreground)]/40" size={20} />
             <input 
               type="text" 
-              placeholder="Search resources..." 
+              placeholder="Search by Course, Uploader, or Keyword..." 
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className="w-full bg-black/5 dark:bg-black/50 border border-[var(--border)] rounded-xl pl-10 pr-4 py-2 text-[var(--foreground)] focus:outline-none focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 transition-colors"
+              className="w-full bg-black/5 dark:bg-white/5 border border-[var(--border)] rounded-2xl pl-12 pr-4 py-4 text-lg font-medium focus:outline-none focus:border-cyan-500 transition-all"
             />
           </div>
-        </div>
-      </div>
-
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-        {filteredResources.map(resource => (
-          <div key={resource.id} className="bg-black/5 dark:bg-white/5 border border-[var(--border)] p-5 rounded-2xl hover:border-cyan-500/30 transition-all group relative">
-            {isAdmin && (
-              <button 
-                onClick={() => setDeleteId(resource.id)}
-                className="absolute top-2 right-2 p-2 bg-red-500/10 text-red-500 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity hover:bg-red-500 hover:text-white"
-              >
-                <Trash2 size={14} />
-              </button>
-            )}
-            <div className="flex justify-between items-start mb-3">
-              <span className="text-xs font-bold bg-cyan-500/10 text-cyan-700 dark:text-cyan-400 px-2 py-1 rounded-md">
-                {resource.course}
-              </span>
-              <span className="text-xs text-[var(--foreground)]/50">{resource.type}</span>
-            </div>
-            <h4 className="font-semibold text-[var(--foreground)] mb-2 line-clamp-2">{resource.title}</h4>
-            <p className="text-xs text-[var(--foreground)]/50 mb-4">Uploaded by {resource.uploadedBy}</p>
-            
-            <a 
-              href={resource.url}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="flex items-center justify-center gap-2 w-full bg-black/5 dark:bg-white/10 hover:bg-black/10 dark:hover:bg-white/20 text-[var(--foreground)] py-2 rounded-xl text-sm font-medium transition-colors"
+          <div className="flex bg-black/5 dark:bg-white/5 p-1 rounded-2xl border border-[var(--border)]">
+            <button 
+              onClick={() => setActiveTab("feed")}
+              className={`px-6 py-3 rounded-xl text-sm font-bold transition-all ${activeTab === "feed" ? "bg-white dark:bg-zinc-800 shadow-sm text-cyan-600" : "text-[var(--foreground)]/50 hover:text-[var(--foreground)]"}`}
             >
-              <Download size={16} /> Download
-            </a>
+              Feed
+            </button>
+            <button 
+              onClick={() => setActiveTab("my-uploads")}
+              className={`px-6 py-3 rounded-xl text-sm font-bold transition-all ${activeTab === "my-uploads" ? "bg-white dark:bg-zinc-800 shadow-sm text-cyan-600" : "text-[var(--foreground)]/50 hover:text-[var(--foreground)]"}`}
+            >
+              My Uploads
+            </button>
           </div>
-        ))}
-        
-        <div 
-          onClick={() => setShowUpload(true)}
-          className="bg-black/5 dark:bg-white/5 border border-dashed border-[var(--border)] p-5 rounded-2xl flex flex-col items-center justify-center text-center hover:bg-black/10 dark:hover:bg-white/10 hover:border-cyan-500/50 transition-all cursor-pointer min-h-[160px]"
-        >
-          <Upload className="text-[var(--foreground)]/50 mb-2" size={24} />
-          <p className="text-sm font-medium text-[var(--foreground)]/70">Upload Resource</p>
-          <p className="text-xs text-[var(--foreground)]/40 mt-1">PDF or Link</p>
         </div>
       </div>
 
-      {showUpload && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
-          <div className="glass-panel max-w-md w-full rounded-3xl p-8 space-y-6">
-            <div className="flex justify-between items-center">
-              <h3 className="text-xl font-bold">Upload Resource</h3>
-              <button onClick={() => setShowUpload(false)} disabled={isUploading} className="text-[var(--foreground)]/50 hover:text-[var(--foreground)]">
-                <X size={24} />
-              </button>
-            </div>
-            <form onSubmit={handleUpload} className="space-y-4">
-              <select 
-                value={newResource.type}
-                onChange={(e) => {
-                  setNewResource({...newResource, type: e.target.value as "PDF" | "Link", url: ""});
-                  setSelectedFile(null);
-                  if (fileInputRef.current) fileInputRef.current.value = "";
-                }}
-                className="w-full bg-black/5 dark:bg-black/50 border border-[var(--border)] rounded-xl p-3 text-[var(--foreground)] focus:outline-none focus:border-cyan-500"
-                disabled={isUploading}
+      {/* Feed Grid */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        {isLoading && resources.length === 0 ? (
+          <FeedSkeleton />
+        ) : (
+          <AnimatePresence mode="popLayout">
+            {filteredAndSortedResources.map((resource, idx) => (
+              <motion.div 
+                key={resource.id}
+                layout
+                initial={{ opacity: 0, scale: 0.9 }}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={{ opacity: 0, scale: 0.9 }}
+                className="glass-panel p-6 rounded-3xl border-[var(--border)] hover:border-cyan-500/30 transition-all group relative flex flex-col justify-between"
               >
-                <option value="PDF">PDF File</option>
-                <option value="Link">External Link</option>
-              </select>
+                {userCourses.includes(resource.course) && activeTab === "feed" && (
+                  <div className="absolute -top-3 -right-3 bg-amber-500 text-white text-[10px] font-black px-3 py-1 rounded-full shadow-lg z-10 animate-bounce">
+                    MATCHED COURSE
+                  </div>
+                )}
 
-              <input 
-                type="text" 
-                placeholder="Title (e.g. Law 101 Past Questions)" 
-                value={newResource.title}
-                onChange={(e) => setNewResource({...newResource, title: e.target.value})}
-                className="w-full bg-black/5 dark:bg-black/50 border border-[var(--border)] rounded-xl p-3 text-[var(--foreground)] focus:outline-none focus:border-cyan-500"
-                required
-                disabled={isUploading}
-              />
-              <input 
-                type="text" 
-                placeholder="Course Code (e.g. LAW 101)" 
-                value={newResource.course}
-                onChange={(e) => setNewResource({...newResource, course: e.target.value.toUpperCase()})}
-                className="w-full bg-black/5 dark:bg-black/50 border border-[var(--border)] rounded-xl p-3 text-[var(--foreground)] focus:outline-none focus:border-cyan-500"
-                required
-                disabled={isUploading}
-              />
-              
-              {newResource.type === "Link" ? (
-                <input 
-                  type="url" 
-                  placeholder="URL (Google Drive, Dropbox, etc.)" 
-                  value={newResource.url}
-                  onChange={(e) => setNewResource({...newResource, url: e.target.value})}
-                  className="w-full bg-black/5 dark:bg-black/50 border border-[var(--border)] rounded-xl p-3 text-[var(--foreground)] focus:outline-none focus:border-cyan-500"
-                  required
-                  disabled={isUploading}
-                />
-              ) : (
-                <div className="relative">
+                <div>
+                  <div className="flex justify-between items-start mb-4">
+                    <div className="flex items-center gap-2">
+                      <div className={`p-2 rounded-xl ${resource.type === 'PDF' ? 'bg-red-500/10 text-red-500' : resource.type === 'Image' ? 'bg-blue-500/10 text-blue-500' : 'bg-emerald-500/10 text-emerald-500'}`}>
+                        {resource.type === 'PDF' ? <FileIcon size={20} /> : resource.type === 'Image' ? <ImageIcon size={20} /> : <ExternalLink size={20} />}
+                      </div>
+                      <span className="text-xs font-black bg-cyan-500/10 text-cyan-700 dark:text-cyan-400 px-3 py-1 rounded-lg tracking-tighter">
+                        {resource.course}
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-1 text-amber-500">
+                      <Star size={14} className="fill-amber-500" />
+                      <span className="text-xs font-bold">{resource.qualityScore}</span>
+                    </div>
+                  </div>
+
+                  <h3 className="text-lg font-bold leading-tight mb-2 group-hover:text-cyan-500 transition-colors line-clamp-2">
+                    {resource.title}
+                  </h3>
+
+                  <div className="flex items-center justify-between mb-6">
+                    <div className="flex items-center gap-2">
+                      <div className="w-8 h-8 rounded-full bg-black/5 dark:bg-white/10 flex items-center justify-center">
+                        <User size={16} className="text-[var(--foreground)]/40" />
+                      </div>
+                      <div>
+                        <p className="text-[10px] font-bold text-[var(--foreground)]/40 uppercase tracking-widest">Uploaded by</p>
+                        <div className="flex items-center gap-1">
+                          <p className="text-xs font-bold">{resource.uploadedBy}</p>
+                          {resource.uploaderVerified && <Star size={10} className="text-blue-500 fill-blue-500" />}
+                        </div>
+                      </div>
+                    </div>
+                    {resource.userId !== user?.uid && (
+                      <button 
+                        onClick={() => followedUploaders.includes(resource.userId) ? unfollowUploader(resource.userId) : followUploader(resource.userId)}
+                        className={`p-2 rounded-xl transition-all ${followedUploaders.includes(resource.userId) ? 'bg-cyan-500 text-white' : 'bg-black/5 dark:bg-white/5 text-cyan-600 hover:bg-cyan-500/10'}`}
+                      >
+                        {followedUploaders.includes(resource.userId) ? <UserMinus size={16} /> : <UserPlus size={16} />}
+                      </button>
+                    )}
+                  </div>
+                </div>
+
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between bg-black/5 dark:bg-white/5 p-2 rounded-2xl">
+                    <div className="flex items-center gap-4">
+                      <button 
+                        onClick={() => handleSocialAction(resource.id, "like")}
+                        className={`flex items-center gap-1 text-xs font-bold transition-all ${likedResources.includes(resource.id) ? 'text-cyan-500' : 'text-[var(--foreground)]/40 hover:text-cyan-500'}`}
+                      >
+                        <ThumbsUp size={16} className={likedResources.includes(resource.id) ? 'fill-cyan-500' : ''} />
+                        {resource.likes}
+                      </button>
+                      <button 
+                        onClick={() => handleSocialAction(resource.id, "dislike")}
+                        className={`flex items-center gap-1 text-xs font-bold transition-all ${dislikedResources.includes(resource.id) ? 'text-red-500' : 'text-[var(--foreground)]/40 hover:text-red-500'}`}
+                      >
+                        <ThumbsDown size={16} className={dislikedResources.includes(resource.id) ? 'fill-red-500' : ''} />
+                        {resource.dislikes}
+                      </button>
+                    </div>
+                    <a 
+                      href={resource.url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="p-2 bg-cyan-600 text-white rounded-xl shadow-lg shadow-cyan-500/20 hover:scale-110 transition-all"
+                    >
+                      <Download size={16} />
+                    </a>
+                  </div>
+
+                  {activeTab === "my-uploads" && (
+                    <button 
+                      onClick={() => setDeleteId(resource.id)}
+                      className="w-full py-2 bg-red-500/10 text-red-500 rounded-xl text-xs font-bold hover:bg-red-500 hover:text-white transition-all"
+                    >
+                      Delete Material
+                    </button>
+                  )}
+                </div>
+              </motion.div>
+            ))}
+          </AnimatePresence>
+        )}
+      </div>
+
+      {/* Loading & Pagination */}
+      {isLoading && (
+        <div className="flex justify-center py-12">
+          <Loader2 className="animate-spin text-cyan-500" size={32} />
+        </div>
+      )}
+
+      {!isLoading && hasMore && (
+        <div className="flex justify-center mt-12">
+          <button 
+            onClick={() => fetchResources()}
+            className="px-8 py-4 bg-black/5 dark:bg-white/5 border border-[var(--border)] rounded-2xl font-bold text-sm hover:bg-black/10 dark:hover:bg-white/10 transition-all flex items-center gap-2"
+          >
+            <ChevronDown size={20} /> Load More Materials
+          </button>
+        </div>
+      )}
+
+      {!isLoading && filteredAndSortedResources.length === 0 && (
+        <div className="text-center py-24 glass-panel rounded-[40px] border-dashed border-2">
+          <div className="w-20 h-20 bg-black/5 dark:bg-white/5 rounded-full flex items-center justify-center mx-auto mb-6">
+            <Search size={40} className="text-[var(--foreground)]/20" />
+          </div>
+          <h3 className="text-2xl font-bold mb-2">No materials found</h3>
+          <p className="text-[var(--foreground)]/50 max-w-xs mx-auto">Try adjusting your search or upload something to help the community!</p>
+        </div>
+      )}
+
+      {/* Upload Modal */}
+      <AnimatePresence>
+        {showUpload && (
+          <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+            <motion.div 
+              initial={{ opacity: 0, scale: 0.9, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.9, y: 20 }}
+              className="glass-panel max-w-md w-full rounded-[40px] p-8 space-y-6 relative overflow-hidden"
+            >
+              <div className="absolute top-0 right-0 p-8 opacity-5 pointer-events-none">
+                <Upload size={120} />
+              </div>
+
+              <div className="flex justify-between items-center relative z-10">
+                <h3 className="text-2xl font-black tracking-tighter">Contribute Material</h3>
+                <button onClick={() => setShowUpload(false)} disabled={isUploading} className="p-2 hover:bg-black/5 dark:hover:bg-white/10 rounded-full transition-colors">
+                  <X size={24} />
+                </button>
+              </div>
+
+              <form onSubmit={handleUpload} className="space-y-4 relative z-10">
+                <div className="grid grid-cols-3 gap-2 p-1 bg-black/5 dark:bg-white/5 rounded-2xl border border-[var(--border)]">
+                  {(["PDF", "Image", "Link"] as const).map(type => (
+                    <button
+                      key={type}
+                      type="button"
+                      onClick={() => {
+                        setNewResource({...newResource, type, url: ""});
+                        setSelectedFile(null);
+                      }}
+                      className={`py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${newResource.type === type ? 'bg-white dark:bg-zinc-800 shadow-sm text-cyan-600' : 'text-[var(--foreground)]/40'}`}
+                    >
+                      {type}
+                    </button>
+                  ))}
+                </div>
+
+                <div className="space-y-1">
+                  <label className="text-[10px] font-black text-[var(--foreground)]/40 uppercase tracking-widest ml-2">Title</label>
                   <input 
-                    type="file" 
-                    accept="application/pdf"
-                    ref={fileInputRef}
-                    onChange={(e) => {
-                      if (e.target.files && e.target.files[0]) {
-                        if (e.target.files[0].size > 10 * 1024 * 1024) {
-                          toast("File size must be less than 10MB");
-                          e.target.value = "";
-                          return;
-                        }
-                        setSelectedFile(e.target.files[0]);
-                      }
-                    }}
-                    className="w-full bg-black/5 dark:bg-black/50 border border-[var(--border)] rounded-xl p-3 text-[var(--foreground)] focus:outline-none focus:border-cyan-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-cyan-500/10 file:text-cyan-600 dark:file:text-cyan-400 hover:file:bg-cyan-500/20"
+                    type="text" 
+                    placeholder="e.g. MTH 101 Cheat Sheet" 
+                    value={newResource.title}
+                    onChange={(e) => setNewResource({...newResource, title: e.target.value})}
+                    className="w-full bg-black/5 dark:bg-white/5 border border-[var(--border)] rounded-2xl p-4 text-sm font-bold focus:outline-none focus:border-cyan-500 transition-all"
                     required
                     disabled={isUploading}
                   />
-                  <p className="text-xs text-[var(--foreground)]/50 mt-2">Max file size: 10MB</p>
                 </div>
-              )}
 
-              <button 
-                type="submit" 
-                disabled={isUploading}
-                className="w-full bg-cyan-600 hover:bg-cyan-700 disabled:bg-cyan-800 disabled:cursor-not-allowed text-white py-4 rounded-2xl font-bold transition-all flex items-center justify-center gap-2"
-              >
-                {isUploading ? <><Loader2 className="animate-spin" size={20} /> Uploading...</> : "Upload to Vault"}
-              </button>
-            </form>
+                <div className="space-y-1">
+                  <label className="text-[10px] font-black text-[var(--foreground)]/40 uppercase tracking-widest ml-2">Course Code</label>
+                  <input 
+                    type="text" 
+                    placeholder="e.g. MTH 101" 
+                    value={newResource.course}
+                    onChange={(e) => setNewResource({...newResource, course: e.target.value.toUpperCase()})}
+                    className="w-full bg-black/5 dark:bg-white/5 border border-[var(--border)] rounded-2xl p-4 text-sm font-bold focus:outline-none focus:border-cyan-500 transition-all"
+                    required
+                    disabled={isUploading}
+                  />
+                </div>
+                
+                {newResource.type === "Link" ? (
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-black text-[var(--foreground)]/40 uppercase tracking-widest ml-2">External URL</label>
+                    <input 
+                      type="url" 
+                      placeholder="Google Drive, Dropbox, etc." 
+                      value={newResource.url}
+                      onChange={(e) => setNewResource({...newResource, url: e.target.value})}
+                      className="w-full bg-black/5 dark:bg-white/5 border border-[var(--border)] rounded-2xl p-4 text-sm font-bold focus:outline-none focus:border-cyan-500 transition-all"
+                      required
+                      disabled={isUploading}
+                    />
+                  </div>
+                ) : (
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-black text-[var(--foreground)]/40 uppercase tracking-widest ml-2">Select {newResource.type}</label>
+                    <div 
+                      onClick={() => !isUploading && fileInputRef.current?.click()}
+                      className="w-full border-2 border-dashed border-[var(--border)] rounded-2xl p-8 flex flex-col items-center justify-center cursor-pointer hover:bg-cyan-500/5 hover:border-cyan-500/30 transition-all group"
+                    >
+                      <input 
+                        type="file" 
+                        accept={newResource.type === "PDF" ? "application/pdf" : "image/*"}
+                        ref={fileInputRef}
+                        onChange={(e) => setSelectedFile(e.target.files?.[0] || null)}
+                        className="hidden"
+                      />
+                      {selectedFile ? (
+                        <div className="flex items-center gap-2 text-cyan-600 font-bold">
+                          <CheckCircle2 size={20} />
+                          <span className="text-sm truncate max-w-[200px]">{selectedFile.name}</span>
+                        </div>
+                      ) : (
+                        <>
+                          <Upload className="text-[var(--foreground)]/20 group-hover:text-cyan-500 transition-colors mb-2" size={32} />
+                          <p className="text-xs font-bold text-[var(--foreground)]/40">Drop file or click to browse</p>
+                        </>
+                      )}
+                    </div>
+                  </div>
+                )}
+
+                <button 
+                  type="submit" 
+                  disabled={isUploading}
+                  className="w-full bg-cyan-600 hover:bg-cyan-700 disabled:bg-cyan-800 disabled:cursor-not-allowed text-white py-5 rounded-2xl font-black uppercase tracking-widest transition-all flex items-center justify-center gap-2 shadow-xl shadow-cyan-500/20"
+                >
+                  {isUploading ? <><Loader2 className="animate-spin" size={20} /> Processing...</> : "Publish to Marketplace"}
+                </button>
+              </form>
+            </motion.div>
           </div>
-        </div>
-      )}
+        )}
+      </AnimatePresence>
       
       <ConfirmModal
         isOpen={!!deleteId}
-        title="Delete Resource"
-        message="Are you sure you want to delete this resource? This action cannot be undone."
-        onConfirm={() => deleteId && handleDelete(deleteId)}
+        title="Delete Material"
+        message="Are you sure you want to remove this material from the marketplace? This action cannot be undone."
+        onConfirm={() => deleteId && (async () => {
+          try {
+            await deleteDoc(doc(db, "resources", deleteId));
+            setResources(prev => prev.filter(r => r.id !== deleteId));
+            setDeleteId(null);
+            toast("Material removed successfully");
+          } catch (e) {
+            toast("Failed to delete material");
+          }
+        })()}
         onCancel={() => setDeleteId(null)}
       />
     </div>
+  );
+}
+
+function CheckCircle2({ size }: { size: number }) {
+  return (
+    <svg 
+      width={size} 
+      height={size} 
+      viewBox="0 0 24 24" 
+      fill="none" 
+      stroke="currentColor" 
+      strokeWidth="3" 
+      strokeLinecap="round" 
+      strokeLinejoin="round"
+    >
+      <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />
+      <polyline points="22 4 12 14.01 9 11.01" />
+    </svg>
   );
 }

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { courses as localCourses, getRandomQuestions, Question, Course } from "../lib/questions";
-import { BookOpen, Play, CheckCircle2, XCircle, Flame, Users, Plus, Activity } from "lucide-react";
+import { BookOpen, Play, CheckCircle2, XCircle, Flame, Users, Plus, Activity, Share2 } from "lucide-react";
 import { doc, updateDoc, increment, collection, getDocs, getDoc, onSnapshot, query, where, addDoc } from "firebase/firestore";
 import { handleFirestoreError, OperationType } from "../utils/errorHandling";
 import { db } from "../firebase";
@@ -430,6 +430,21 @@ export default function CBT({ user, isFocusMode, setIsFocusMode }: { user: any, 
           <div className="pt-6 flex flex-col md:flex-row gap-4 justify-center">
             <button 
               onClick={() => {
+                const text = `I just scored ${score}/${questions.length} (${percentage.toFixed(1)}%) in ${selectedCourse} on Digital Nexus! 🚀 Can you beat my score?`;
+                window.dispatchEvent(new CustomEvent("open-share-modal", {
+                  detail: {
+                    title: "My CBT Result",
+                    text: text,
+                    url: window.location.origin
+                  }
+                }));
+              }}
+              className="bg-emerald-500 hover:bg-emerald-600 text-white px-8 py-4 rounded-2xl font-bold transition-all shadow-md flex items-center justify-center gap-2"
+            >
+              <Share2 size={20} /> Share Result
+            </button>
+            <button 
+              onClick={() => {
                 setSelectedCourse(null);
                 setCurrentHostedTestId(null);
                 setIsFinished(false);
@@ -567,8 +582,8 @@ export default function CBT({ user, isFocusMode, setIsFocusMode }: { user: any, 
   return (
     <div className="space-y-8">
       <Helmet>
-        <title>CBT Engine | ICEPAB Nexus</title>
-        <meta name="description" content="Practice exams for GST 111, BUS 101, SOC 101, and AMS 103 on the ICEPAB Nexus CBT Engine." />
+        <title>CBT Engine | Digital Nexus</title>
+        <meta name="description" content="Practice exams for GST 111, BUS 101, SOC 101, and AMS 103 on the Digital Nexus CBT Engine." />
         <link rel="canonical" href={`${import.meta.env.NEXT_PUBLIC_BASE_URL || 'https://icepab-nexus.run.app'}/cbt`} />
         <script type="application/ld+json">
           {`
@@ -584,7 +599,7 @@ export default function CBT({ user, isFocusMode, setIsFocusMode }: { user: any, 
                   "description": course.description,
                   "provider": {
                     "@type": "Organization",
-                    "name": "ICEPAB Nexus",
+                    "name": "Digital Nexus",
                     "sameAs": "${import.meta.env.NEXT_PUBLIC_BASE_URL || 'https://icepab-nexus.run.app'}"
                   },
                   "courseCode": course.code

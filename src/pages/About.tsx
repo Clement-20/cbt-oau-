@@ -23,7 +23,7 @@ export default function About() {
   return (
     <div className="max-w-4xl mx-auto space-y-12 py-8">
       <Helmet>
-        <title>About Us | ICEPAB Digital Nexus</title>
+        <title>About Us | Digital Nexus</title>
       </Helmet>
 
       <div className="text-center space-y-4">
@@ -81,7 +81,7 @@ export default function About() {
         <Heart className="mx-auto text-red-500 animate-pulse" size={48} />
         <h2 className="text-3xl font-bold">Our Mission</h2>
         <p className="text-lg text-[var(--foreground)]/70 max-w-2xl mx-auto leading-relaxed">
-          ICEPAB Digital Nexus was created to revolutionize how students prepare for exams. By leveraging AI and community collaboration, we provide a platform where learning is interactive, accessible, and highly effective.
+          Digital Nexus was created to revolutionize how students prepare for exams. By leveraging AI and community collaboration, we provide a platform where learning is interactive, accessible, and highly effective.
         </p>
       </div>
 

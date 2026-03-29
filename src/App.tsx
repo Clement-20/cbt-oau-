@@ -27,11 +27,15 @@ const Setup = lazy(() => import("./pages/Setup"));
 const About = lazy(() => import("./pages/About"));
 const Community = lazy(() => import("./pages/Community"));
 const Verification = lazy(() => import("./pages/Verification"));
+const Resources = lazy(() => import("./pages/Resources"));
 
 import { ErrorBoundary } from "./components/ErrorBoundary";
 import LoadingLogo from "./components/LoadingLogo";
 import Tutorial from "./components/Tutorial";
 import FloatingAI from "./components/FloatingAI";
+import ShareModal from "./components/ShareModal";
+
+import BottomNav from "./nexus-features/BottomNav";
 
 const LoadingFallback = () => (
   <div className="min-h-[60vh] flex flex-col items-center justify-center">
@@ -46,6 +50,8 @@ function MainApp() {
   const [loading, setLoading] = useState(true);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [showTutorial, setShowTutorial] = useState(false);
+  const [showShareModal, setShowShareModal] = useState(false);
+  const [shareData, setShareData] = useState<{ title?: string; text?: string; url?: string }>({});
   const [showStudyDeck, setShowStudyDeck] = useState(false);
   const [isFocusMode, setIsFocusMode] = useState(false);
   const [studyDeckContext, setStudyDeckContext] = useState<string | undefined>();
@@ -65,7 +71,21 @@ function MainApp() {
       setShowStudyDeck(true);
     };
     window.addEventListener("open-ai-assistant", handleOpenAI);
-    return () => window.removeEventListener("open-ai-assistant", handleOpenAI);
+    
+    const handleOpenShare = (e: any) => {
+      if (e.detail) {
+        setShareData(e.detail);
+      } else {
+        setShareData({});
+      }
+      setShowShareModal(true);
+    };
+    window.addEventListener("open-share-modal", handleOpenShare);
+    
+    return () => {
+      window.removeEventListener("open-ai-assistant", handleOpenAI);
+      window.removeEventListener("open-share-modal", handleOpenShare);
+    };
   }, []);
 
   useEffect(() => {
@@ -222,6 +242,7 @@ function MainApp() {
     { path: "/cbt", label: "CBT Engine" },
     { path: "/validate", label: "Validator" },
     { path: "/leaderboard", label: "Leaderboard" },
+    { path: "/resources", label: "Resources" },
     { path: "/community", label: "Community", icon: <Users size={14} /> },
     ...(isPaymentEnabled ? [{ path: "/verification", label: "Verify Student", icon: <BadgeCheck size={14} /> }] : []),
     { path: "/about", label: "About", icon: <Zap size={14} /> },
@@ -230,17 +251,17 @@ function MainApp() {
   return (
     <div className="min-h-screen bg-[var(--background)] text-[var(--foreground)] font-sans transition-colors duration-300">
       <Helmet>
-        <title>ICEPAB Nexus | OAU Digital Hub by Clement IfeOluwa</title>
+        <title>Digital Nexus | OAU Digital Hub by Clement IfeOluwa</title>
         <meta name="description" content="The ultimate OAU student super-app by Clement IfeOluwa. Practice OAU CBT GST 111, use the OAU CGPA Calculator, and read the OAU Freshers Guide. Built for Great Ife." />
         <meta name="keywords" content="OAU CBT GST 111, OAU CGPA Calculator, OAU Freshers Guide, Obafemi Awolowo University, Clement IfeOluwa, Digital Nexus, CBT, GST 111, OAU Portal, ICEPAB" />
-        <meta property="og:title" content="ICEPAB Nexus | OAU Digital Hub by Clement IfeOluwa" />
+        <meta property="og:title" content="Digital Nexus | OAU Digital Hub by Clement IfeOluwa" />
         <meta property="og:description" content="The ultimate OAU student super-app. Practice OAU CBT GST 111, use the OAU CGPA Calculator, and read the OAU Freshers Guide." />
         <meta property="og:type" content="website" />
         <meta property="og:url" content={`${import.meta.env.NEXT_PUBLIC_BASE_URL || 'https://icepab-nexus.run.app'}${location.pathname}`} />
         <meta property="og:image" content={`${import.meta.env.NEXT_PUBLIC_BASE_URL || 'https://icepab-nexus.run.app'}/og-image.png`} />
         <link rel="canonical" href={`${import.meta.env.NEXT_PUBLIC_BASE_URL || 'https://icepab-nexus.run.app'}${location.pathname}${location.search}`} />
         <meta name="twitter:card" content="summary_large_image" />
-        <meta name="twitter:title" content="ICEPAB Nexus | OAU Digital Hub" />
+        <meta name="twitter:title" content="Digital Nexus | OAU Digital Hub" />
         <meta name="twitter:description" content="The ultimate OAU student super-app. Practice OAU CBT GST 111, use the OAU CGPA Calculator, and read the OAU Freshers Guide." />
         <meta name="theme-color" content="#2563eb" />
         <meta name="robots" content="index, follow" />
@@ -252,7 +273,7 @@ function MainApp() {
         <div className="max-w-7xl mx-auto flex justify-between items-center">
           <div className="flex items-center gap-8">
             <Link to="/" className="text-xl font-bold tracking-tighter flex items-center gap-2">
-              <span className="text-blue-600 dark:text-blue-500">ICEPAB</span> Nexus
+              Digital Nexus
             </Link>
             <div className="hidden md:flex gap-6 text-sm font-medium text-[var(--foreground)]/70">
               {navLinks.map((link) => (
@@ -276,6 +297,14 @@ function MainApp() {
               aria-label="Toggle theme"
             >
               {theme === 'dark' ? <Sun size={18} /> : <Moon size={18} />}
+            </button>
+
+            <button 
+              onClick={() => setShowShareModal(true)}
+              className="p-2 rounded-full hover:bg-black/5 dark:hover:bg-white/10 transition-colors text-emerald-500"
+              aria-label="Share app"
+            >
+              <Share2 size={18} />
             </button>
 
             <button 
@@ -386,6 +415,7 @@ function MainApp() {
             <Route path="/about" element={<About />} />
             <Route path="/community" element={<Community user={user} />} />
             <Route path="/verification" element={<Verification user={user} />} />
+            <Route path="/resources" element={<Resources user={user} />} />
           </Routes>
         </Suspense>
       </main>
@@ -400,6 +430,16 @@ function MainApp() {
       </footer>
 
       {showTutorial && <Tutorial onClose={() => setShowTutorial(false)} />}
+      {showShareModal && (
+        <ShareModal 
+          isOpen={showShareModal} 
+          onClose={() => {
+            setShowShareModal(false);
+            setShareData({});
+          }} 
+          {...shareData}
+        />
+      )}
       {!isAIChatPage && <FloatingAI />}
       {showStudyDeck && (
         <StudyDeck 
@@ -413,6 +453,7 @@ function MainApp() {
           initialPrompt={studyDeckPrompt}
         />
       )}
+      <BottomNav />
       <Toast />
     </div>
   );

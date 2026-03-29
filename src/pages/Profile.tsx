@@ -2,7 +2,7 @@ import React, { useState, useEffect } from "react";
 import { doc, getDoc, updateDoc } from "firebase/firestore";
 import { handleFirestoreError, OperationType } from "../utils/errorHandling";
 import { db } from "../firebase";
-import { User, BadgeCheck, Upload, CreditCard, CheckCircle2, Loader2, Save, Flame, Clock, Target } from "lucide-react";
+import { User, BadgeCheck, Upload, CreditCard, CheckCircle2, Loader2, Save, Flame, Clock, Target, Share2 } from "lucide-react";
 import { Helmet } from "react-helmet-async";
 import { toast } from "../components/Toast";
 import { getSettings, subscribeToSettings } from "../lib/settings";
@@ -75,14 +75,31 @@ export default function Profile({ user }: { user: any }) {
   return (
     <div className="max-w-2xl mx-auto space-y-8">
       <Helmet>
-        <title>Profile | ICEPAB Nexus</title>
-        <meta name="description" content="Manage your ICEPAB Nexus profile and verification status." />
+        <title>Profile | Digital Nexus</title>
+        <meta name="description" content="Manage your Digital Nexus profile and verification status." />
       </Helmet>
-      <div>
-        <h1 className="text-3xl font-bold tracking-tighter flex items-center gap-3">
-          <User className="text-blue-500" /> User Profile
-        </h1>
-        <p className="text-[var(--foreground)]/60 mt-2 font-medium">Manage your identity and verification status.</p>
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div>
+          <h1 className="text-3xl font-bold tracking-tighter flex items-center gap-3">
+            <User className="text-blue-500" /> User Profile
+          </h1>
+          <p className="text-[var(--foreground)]/60 mt-2 font-medium">Manage your identity and verification status.</p>
+        </div>
+        <button 
+          onClick={() => {
+            const text = `Check out my student profile on Digital Nexus! ${isShana ? "I'm a Certified Shana! 🔥" : ""} ${isVerified ? "I'm Verified! ✅" : ""}`;
+            window.dispatchEvent(new CustomEvent("open-share-modal", {
+              detail: {
+                title: `${displayName}'s Profile`,
+                text: text,
+                url: window.location.origin
+              }
+            }));
+          }}
+          className="flex items-center justify-center gap-2 bg-emerald-500 hover:bg-emerald-600 text-white px-5 py-3 rounded-xl font-bold transition-all shadow-md shrink-0"
+        >
+          <Share2 size={18} /> Share Profile
+        </button>
       </div>
 
       {/* Profile Edit Section */}

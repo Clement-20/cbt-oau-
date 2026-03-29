@@ -82,7 +82,7 @@ export default function Verification({ user }: { user: any }) {
   return (
     <div className="max-w-md mx-auto py-12 px-4">
       <Helmet>
-        <title>Verify Student | ICEPAB Nexus</title>
+        <title>Verify Student | Digital Nexus</title>
       </Helmet>
       <div className="glass-panel p-8 rounded-3xl space-y-6">
         <h1 className="text-2xl font-bold flex items-center gap-2">
