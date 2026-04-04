@@ -54,6 +54,12 @@ export default function AddHustleModal({ user, onClose }: { user: any, onClose: 
       });
       
       toast("Hustle added successfully! 🚀");
+      setItemName('');
+      setCategory('Product');
+      setPrice('');
+      setWhatsappNumber('');
+      setLocation('Onsite');
+      setImage(null);
       onClose();
     } catch (error) {
       console.error("Error adding hustle:", error);

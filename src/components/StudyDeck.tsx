@@ -1,6 +1,5 @@
 import React, { useState, useRef, useEffect } from "react";
 import { Send, Bot, User, Loader2, X, Sparkles, BookOpen, MessageSquare, Trash2 } from "lucide-react";
-import { GoogleGenAI } from "@google/genai";
 import { checkAndUseNexusEnergy } from "../utils/nexusUtils";
 import NexusEnergyModal from "./NexusEnergyModal";
 
@@ -45,7 +44,17 @@ export default function StudyDeck({ user, onClose, contextText, initialPrompt }:
     if (!messageToSend || isLoading) return;
 
     if (!directPrompt) setInput("");
-    setMessages(prev => [...prev, { role: "user", text: messageToSend }]);
+    
+    // Add user message
+    let userMessageAdded = false;
+    setMessages(prev => {
+      if (prev[prev.length - 1]?.role === "user" && prev[prev.length - 1]?.text === messageToSend) {
+        return prev; // Prevent duplicate user messages
+      }
+      userMessageAdded = true;
+      return [...prev, { role: "user", text: messageToSend }];
+    });
+
     setIsLoading(true);
 
     try {
@@ -53,43 +62,105 @@ export default function StudyDeck({ user, onClose, contextText, initialPrompt }:
       const { allowed } = await checkAndUseNexusEnergy(user.uid);
       if (!allowed) {
         setShowEnergyModal(true);
-        setIsLoading(false);
         return;
       }
 
-      const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
-      const chat = ai.chats.create({
-        model: "gemini-3-flash-preview",
-        config: {
-          systemInstruction: `You are the Nexus Academic Tutor, a helpful and knowledgeable assistant for OAU students. 
-          Your goal is to explain complex concepts simply, provide study tips, and help students prepare for exams.
-          ${contextText ? `Use this context from the student's study material to help answer: ${contextText.slice(0, 5000)}` : ""}
-          Keep your responses concise, encouraging, and academic.`
-        }
-      });
-
       // Add a placeholder for the model response
-      setMessages(prev => [...prev, { role: "model", text: "" }]);
+      let placeholderAdded = false;
+      setMessages(prev => {
+        const lastMsg = prev[prev.length - 1];
+        // Only add placeholder if the last message is not already a model message with empty text
+        if (lastMsg.role !== "model" || lastMsg.text !== "") {
+          placeholderAdded = true;
+          return [...prev, { role: "model", text: "" }];
+        }
+        return prev;
+      });
       
-      const streamResponse = await chat.sendMessageStream({ message: messageToSend });
+      // Call server endpoint for streaming with timeout
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 second timeout
       
-      for await (const chunk of streamResponse) {
-        setMessages(prev => {
-          const newMessages = [...prev];
-          const lastMessage = newMessages[newMessages.length - 1];
-          lastMessage.text += chunk.text;
-          return newMessages;
+      let response;
+      try {
+        response = await fetch("/api/ai/chat", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            message: messageToSend,
+            contextText
+          }),
+          signal: controller.signal
         });
+      } finally {
+        clearTimeout(timeoutId);
       }
-    } catch (error) {
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({ error: response.statusText }));
+        throw new Error(errorData.error || `Server error: ${response.statusText}`);
+      }
+
+      const reader = response.body?.getReader();
+      if (!reader) throw new Error("No response body");
+
+      const decoder = new TextDecoder();
+      let buffer = "";
+      let hasReceivedData = false;
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split("\n");
+        buffer = lines.pop() || "";
+
+        for (const line of lines) {
+          if (line.startsWith("data: ")) {
+            const data = line.slice(6);
+            if (data === "[DONE]" || data === "[ERROR]") continue;
+            
+            try {
+              const parsed = JSON.parse(data);
+              if (parsed.error) {
+                throw new Error(parsed.error);
+              }
+              
+              hasReceivedData = true;
+              setMessages(prev => {
+                const newMessages = [...prev];
+                const lastMessage = newMessages[newMessages.length - 1];
+                if (lastMessage.role === "model") {
+                  lastMessage.text += parsed.text || "";
+                }
+                return newMessages;
+              });
+            } catch (e: any) {
+              console.error("Parse error:", e);
+            }
+          }
+        }
+      }
+
+      // If no data was received, show an error
+      if (!hasReceivedData) {
+        throw new Error("No response from server");
+      }
+    } catch (error: any) {
       console.error("Chat error:", error);
+      const errorMessage = error?.message || "Nexus connection interrupted. Please try again.";
+      
       setMessages(prev => {
         const newMessages = [...prev];
         const lastMessage = newMessages[newMessages.length - 1];
+        
+        // Only update the placeholder if it's empty
         if (lastMessage.role === "model" && lastMessage.text === "") {
-          lastMessage.text = "Nexus connection interrupted. Please try again.";
-        } else {
-          newMessages.push({ role: "model", text: "Nexus connection interrupted. Please try again." });
+          lastMessage.text = errorMessage;
+        } else if (lastMessage.role !== "model") {
+          // Only add error if the last message isn't already a model message
+          newMessages.push({ role: "model", text: errorMessage });
         }
         return newMessages;
       });

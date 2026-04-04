@@ -7,16 +7,18 @@ import { clsx } from "clsx";
 interface AITutorProps {
   question: string;
   options: string[];
-  correctAnswer: string;
+  correctAnswerIndex: number;
   isVerified: boolean;
   isVisible: boolean;
 }
 
-export default function AITutor({ question, options, correctAnswer, isVerified, isVisible }: AITutorProps) {
+export default function AITutor({ question, options, correctAnswerIndex, isVerified, isVisible }: AITutorProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [explanation, setExplanation] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [showPaywall, setShowPaywall] = useState(false);
+  const [adCredits, setAdCredits] = useState(0);
+  const [isWatchingAd, setIsWatchingAd] = useState(false);
   const { aiExplanationsUsed, incrementAIUsage } = useAcademicStore();
   const [position, setPosition] = useState({ x: 0, y: 0 });
   
@@ -27,9 +29,13 @@ export default function AITutor({ question, options, correctAnswer, isVerified, 
   const FREE_LIMIT = 5;
 
   const handleExplain = async () => {
-    if (!isVerified && aiExplanationsUsed >= FREE_LIMIT) {
+    if (!isVerified && aiExplanationsUsed >= FREE_LIMIT && adCredits <= 0) {
       setShowPaywall(true);
       return;
+    }
+
+    if (!isVerified && aiExplanationsUsed >= FREE_LIMIT && adCredits > 0) {
+      setAdCredits((prev) => Math.max(prev - 1, 0));
     }
 
     setIsOpen(true);
@@ -37,13 +43,15 @@ export default function AITutor({ question, options, correctAnswer, isVerified, 
 
     setIsLoading(true);
     try {
+      const selectedCorrectAnswer = options[correctAnswerIndex] || "";
       const response = await fetch("/api/ai/explain", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           question,
           options,
-          correctAnswer,
+          correctAnswer: correctAnswerIndex,
+          correctAnswerText: selectedCorrectAnswer,
           userId: "current-user-id" // In a real app, we'd pass a token
         })
       });
@@ -103,6 +111,7 @@ export default function AITutor({ question, options, correctAnswer, isVerified, 
               </div>
 
               <div className="max-h-[300px] overflow-y-auto pr-2 custom-scrollbar">
+                <div className="text-xs font-semibold text-blue-600 mb-3">Correct Answer: {options[correctAnswerIndex] || "Unknown"}</div>
                 {isLoading ? (
                   <div className="space-y-3 py-4">
                     <div className="h-4 bg-blue-500/10 rounded-full w-full animate-pulse"></div>
@@ -118,16 +127,38 @@ export default function AITutor({ question, options, correctAnswer, isVerified, 
               </div>
 
               {!isVerified && (
-                <div className="mt-4 pt-4 border-t border-[var(--border)] flex justify-between items-center">
-                  <p className="text-[10px] font-bold text-[var(--foreground)]/40 uppercase">
-                    Free Explanations: {FREE_LIMIT - aiExplanationsUsed} left
-                  </p>
-                  <button 
-                    onClick={() => setShowPaywall(true)}
-                    className="text-[10px] font-black text-blue-600 hover:underline uppercase"
-                  >
-                    Get Unlimited
-                  </button>
+                <div className="mt-4 pt-4 border-t border-[var(--border)] flex flex-col gap-2">
+                  <div className="flex justify-between items-center">
+                    <p className="text-[10px] font-bold text-[var(--foreground)]/40 uppercase">
+                      Free Explanations: {Math.max(FREE_LIMIT - aiExplanationsUsed, 0)} left
+                    </p>
+                    <p className="text-[10px] font-bold text-[var(--foreground)]/40 uppercase">
+                      Ad Credits: {adCredits}
+                    </p>
+                  </div>
+                  <div className="flex gap-2">
+                    <button 
+                      onClick={() => setShowPaywall(true)}
+                      className="flex-1 text-[10px] font-black text-blue-600 hover:underline uppercase"
+                    >
+                      Get Unlimited
+                    </button>
+                    <button
+                      onClick={async () => {
+                        if (isWatchingAd) return;
+                        setIsWatchingAd(true);
+                        // Simulate ad watch; replace with real ad provider flow.
+                        await new Promise((resolve) => setTimeout(resolve, 3000));
+                        setAdCredits((prev) => prev + 1);
+                        setIsWatchingAd(false);
+                        setShowPaywall(false);
+                      }}
+                      disabled={isWatchingAd}
+                      className="flex-1 text-[10px] font-black text-green-600 hover:underline uppercase disabled:opacity-40"
+                    >
+                      {isWatchingAd ? "Watching Ad..." : "Watch an Ad"}
+                    </button>
+                  </div>
                 </div>
               )}
             </motion.div>

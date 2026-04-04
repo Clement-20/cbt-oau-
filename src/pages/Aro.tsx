@@ -31,7 +31,7 @@ export default function Aro({ user }: { user: any }) {
   };
 
   const shareToWhatsApp = () => {
-    const text = `*Digital Nexus Aro:*\n\n"${currentAro}"\n\nGenerated via OAU Digital Nexus ❄️`;
+    const text = `*Digital Nexus Aro:*\n\n"${currentAro}"\n\nGenerated via Digital Nexus OAU ❄️`;
     window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, '_blank');
   };
 

@@ -42,21 +42,7 @@ export default function Validator({ user }: { user: any }) {
 
   const submitQuestion = async () => {
     if (!courseCode.trim() || !question.trim() || options.some(opt => !opt.trim()) || !user) {
-      toast("❌ Please fill in all fields");
-      return;
-    }
-
-    // Validate input lengths
-    if (courseCode.length > 20) {
-      toast("❌ Course code too long (max 20 characters)");
-      return;
-    }
-    if (question.length > 1000) {
-      toast("❌ Question too long (max 1000 characters)");
-      return;
-    }
-    if (options.some(opt => opt.length > 500)) {
-      toast("❌ Option text too long (max 500 characters each)");
+      toast("Please fill in all fields");
       return;
     }
 
@@ -65,21 +51,20 @@ export default function Validator({ user }: { user: any }) {
     try {
       // Save to pending_questions collection
       const docRef = await addDoc(collection(db, "pending_questions"), {
-        courseCode: courseCode.toUpperCase().slice(0, 20),
-        question: question.trim().slice(0, 1000),
-        options: options.map(opt => opt.trim().slice(0, 500)),
+        courseCode: courseCode.toUpperCase(),
+        question: question.trim(),
+        options: options.map(opt => opt.trim()),
         correctAnswer: parseInt(correctAnswer.toString()),
         authorId: user.uid,
         authorEmail: user.email,
-        authorName: user.displayName || "Anonymous",
+        authorName: user.displayName,
         votes: 0,
-        rejections: 0,
         voters: [],
         status: "pending",
         timestamp: serverTimestamp()
       });
 
-      toast(`✅ Question submitted! ID: ${docRef.id.substring(0, 8)}. Needs 20 votes to approve or 10 rejects to remove.`);
+      toast(`✅ Question submitted! ID: ${docRef.id.substring(0, 8)}`);
       
       // Reset form
       setCourseCode("");
@@ -87,16 +72,8 @@ export default function Validator({ user }: { user: any }) {
       setOptions(["", "", "", ""]);
       setCorrectAnswer(0);
       setIsProcessing(false);
-    } catch (error: any) {
-      console.error("Upload error:", error);
-      const errorMsg = error?.message || "Unknown error";
-      if (errorMsg.includes("permission")) {
-        toast("❌ Permission denied. Make sure you're logged in.");
-      } else if (errorMsg.includes("missing")) {
-        toast("❌ Missing required fields.");
-      } else {
-        toast(`❌ Upload failed: ${errorMsg.substring(0, 100)}`);
-      }
+    } catch (error) {
+      handleFirestoreError(error, OperationType.CREATE, "pending_questions");
       setIsProcessing(false);
     }
   };
@@ -123,17 +100,10 @@ export default function Validator({ user }: { user: any }) {
         }
 
         const newVotes = (data.votes || 0) + (isLegit ? 1 : -1);
-        const newRejections = isLegit ? (data.rejections || 0) : (data.rejections || 0) + 1;
         const newVoters = [...(data.voters || []), user.uid];
 
-        // ✅ AUTO-DELETE if 10 rejects
-        if (newRejections >= 10) {
-          transaction.delete(qRef);
-          return;
-        }
-
-        // ✅ AUTO-APPROVE if 20 votes or admin
         if (newVotes >= 20 || isAdmin) {
+          // Approve and move to courses collection
           const courseRef = doc(db, "courses", data.courseCode);
           const courseSnap = await transaction.get(courseRef);
           
@@ -141,9 +111,7 @@ export default function Validator({ user }: { user: any }) {
             question: data.question,
             options: data.options,
             correctAnswer: data.correctAnswer,
-            id: qDoc.id,
-            addedBy: data.authorName,
-            addedAt: new Date().toISOString()
+            id: qDoc.id
           };
 
           if (courseSnap.exists()) {
@@ -152,24 +120,23 @@ export default function Validator({ user }: { user: any }) {
             });
           } else {
             transaction.set(courseRef, {
-              code: data.courseCode,
               title: `${data.courseCode} (Community)`,
               description: "Community verified questions.",
               questions: [newQuestion]
             });
           }
           
-          // ✅ AUTO-DELETE after approval
-          transaction.delete(qRef);
-          return;
+          transaction.update(qRef, { 
+            status: "approved",
+            voters: newVoters,
+            votes: newVotes
+          });
+        } else {
+          transaction.update(qRef, {
+            votes: newVotes,
+            voters: newVoters
+          });
         }
-
-        // Update votes/rejections
-        transaction.update(qRef, {
-          votes: newVotes,
-          rejections: newRejections,
-          voters: newVoters
-        });
       });
       
       if (isAdmin) {

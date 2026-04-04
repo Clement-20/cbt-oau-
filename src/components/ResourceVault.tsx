@@ -138,21 +138,42 @@ export default function ResourceMarketplace({ user, isAdmin }: { user?: any, isA
       let finalUrl = "";
       
       if (newResource.type === "Image" && selectedFile) {
-        // Cloudinary Direct Upload
-        const formData = new FormData();
-        formData.append("file", selectedFile);
-        formData.append("upload_preset", "nexus_unsigned"); // User must configure this
-        
-        const response = await fetch(`https://api.cloudinary.com/v1_1/digital-nexus/image/upload`, {
-          method: "POST",
-          body: formData
-        });
-        
-        if (!response.ok) throw new Error("Cloudinary upload failed");
-        const data = await response.json();
-        finalUrl = data.secure_url;
+        // Try Cloudinary first if configured, fallback to Firebase Storage
+        const cloudName = process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME;
+        const uploadPreset = process.env.NEXT_PUBLIC_CLOUDINARY_UPLOAD_PRESET;
+
+        if (cloudName && uploadPreset) {
+          try {
+            const formData = new FormData();
+            formData.append("file", selectedFile);
+            formData.append("upload_preset", uploadPreset);
+            
+            const response = await fetch(`https://api.cloudinary.com/v1_1/${cloudName}/image/upload`, {
+              method: "POST",
+              body: formData
+            });
+            
+            if (response.ok) {
+              const data = await response.json();
+              finalUrl = data.secure_url;
+            } else {
+              throw new Error("Cloudinary upload failed");
+            }
+          } catch (err) {
+            console.warn("Cloudinary upload failed, falling back to Firebase Storage", err);
+            // Fallback to Firebase Storage
+            const storageRef = ref(storage, `resources/images/${user.uid}_${Date.now()}_${selectedFile.name}`);
+            await uploadBytes(storageRef, selectedFile);
+            finalUrl = await getDownloadURL(storageRef);
+          }
+        } else {
+          // No Cloudinary config, use Firebase Storage
+          const storageRef = ref(storage, `resources/images/${user.uid}_${Date.now()}_${selectedFile.name}`);
+          await uploadBytes(storageRef, selectedFile);
+          finalUrl = await getDownloadURL(storageRef);
+        }
       } else if (newResource.type === "PDF" && selectedFile) {
-        // Firebase Storage Upload
+        // Firebase Storage Upload for PDFs
         const storageRef = ref(storage, `resources/${user.uid}_${Date.now()}_${selectedFile.name}`);
         await uploadBytes(storageRef, selectedFile);
         finalUrl = await getDownloadURL(storageRef);

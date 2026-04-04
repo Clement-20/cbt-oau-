@@ -16,7 +16,7 @@ export default defineConfig(({mode}) => {
         manifest: {
           name: 'ICEPAB Nexus',
           short_name: 'Nexus',
-          description: 'OAU Digital Nexus Application',
+          description: 'Digital Nexus OAU Application',
           theme_color: '#2563eb',
           background_color: '#ffffff',
           display: 'standalone',

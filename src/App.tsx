@@ -1,4 +1,4 @@
-import { BrowserRouter as Router, Routes, Route, Link, useLocation } from "react-router-dom";
+import { HashRouter as Router, Routes, Route, Link, useLocation } from "react-router-dom";
 import { ThemeProvider, useTheme } from "./components/theme-provider";
 import { getSettings, subscribeToSettings } from "./lib/settings";
 import { HelmetProvider, Helmet } from "react-helmet-async";
@@ -29,6 +29,7 @@ const Community = lazy(() => import("./pages/Community"));
 const Verification = lazy(() => import("./pages/Verification"));
 const Resources = lazy(() => import("./pages/Resources"));
 const StudyMode = lazy(() => import("./pages/StudyMode"));
+const NotFound = lazy(() => import("./pages/NotFound"));
 
 import { ErrorBoundary } from "./components/ErrorBoundary";
 import LoadingLogo from "./components/LoadingLogo";
@@ -430,6 +431,7 @@ function MainApp() {
             <Route path="/verification" element={<Verification user={user} />} />
             <Route path="/resources" element={<Resources user={user} />} />
             <Route path="/study-mode" element={<StudyMode user={user} />} />
+            <Route path="*" element={<NotFound />} />
           </Routes>
         </Suspense>
       </main>

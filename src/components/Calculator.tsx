@@ -16,12 +16,36 @@ export default function Calculator({ onClose }: { onClose: () => void }) {
 
   const calculate = () => {
     try {
-      const result = eval(equation + display);
+      // Simple safe math evaluation without eval
+      const expression = equation + display;
+      const result = safeEvaluateMath(expression);
       setDisplay(String(result));
       setEquation("");
     } catch (e) {
       setDisplay("Error");
     }
+  };
+
+  // Safe math evaluation function
+  const safeEvaluateMath = (expr: string): number => {
+    // Remove spaces and validate input
+    const cleanExpr = expr.replace(/\s+/g, '');
+    
+    // Only allow numbers, operators, and decimal points
+    if (!/^[\d+\-*/().]+$/.test(cleanExpr)) {
+      throw new Error('Invalid characters');
+    }
+    
+    // Use Function constructor as a safer alternative to eval
+    // Still restrict to math operations only
+    const func = new Function('return ' + cleanExpr);
+    const result = func();
+    
+    if (typeof result !== 'number' || !isFinite(result)) {
+      throw new Error('Invalid result');
+    }
+    
+    return result;
   };
 
   const clear = () => {

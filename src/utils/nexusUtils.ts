@@ -1,7 +1,9 @@
 import { doc, getDoc, updateDoc, increment, setDoc } from "firebase/firestore";
 import { db } from "../firebase";
 
-export const NEXUS_DAILY_LIMIT = 10;
+// Reasonable daily limit - once user hits this, show depleted message
+// Set to 50 so users can do plenty of AI requests before hitting limit
+export const NEXUS_DAILY_LIMIT = 50;
 
 export interface NexusQuota {
   dailyTokenCount: number;
@@ -16,12 +18,13 @@ export interface NexusStreak {
 /**
  * Checks if the user has enough "Nexus Energy" (tokens) for an AI interaction.
  * Resets the count if it's a new day.
+ * Only returns false when user has truly hit the daily limit.
  */
 export async function checkAndUseNexusEnergy(userId: string): Promise<{ allowed: boolean; remaining: number }> {
   const userRef = doc(db, "users", userId);
   const userSnap = await getDoc(userRef);
   
-  if (!userSnap.exists()) return { allowed: false, remaining: 0 };
+  if (!userSnap.exists()) return { allowed: true, remaining: NEXUS_DAILY_LIMIT };
   
   const data = userSnap.data();
   const now = new Date();
@@ -40,6 +43,7 @@ export async function checkAndUseNexusEnergy(userId: string): Promise<{ allowed:
     });
   }
   
+  // Check if truly depleted
   if (dailyTokenCount >= NEXUS_DAILY_LIMIT) {
     return { allowed: false, remaining: 0 };
   }

@@ -81,8 +81,8 @@ service cloud.firestore {
 
     match /pending_questions/{questionId} {
       allow read: if isAuthenticated();
-      allow create: if isAuthenticated() && hasRequiredFields(['courseCode', 'question', 'options', 'correctAnswer', 'authorId', 'status', 'votes', 'voters', 'timestamp']) && isValidString('question', 1, 1000) && isValidList(request.resource.data.options, 10) && hasOnlyAllowedFields(['courseCode', 'question', 'options', 'correctAnswer', 'authorId', 'status', 'votes', 'voters', 'timestamp']);
-      allow update: if isAuthenticated() && areImmutableFieldsUnchanged(['timestamp', 'authorId']) && hasOnlyAllowedFields(['courseCode', 'question', 'options', 'correctAnswer', 'authorId', 'status', 'votes', 'voters', 'timestamp']);
+      allow create: if isAuthenticated() && hasRequiredFields(['courseCode', 'question', 'options', 'correctAnswer', 'authorId', 'status', 'votes', 'rejections', 'voters', 'timestamp']) && isValidString('question', 1, 1000) && isValidList(request.resource.data.options, 4) && hasOnlyAllowedFields(['courseCode', 'question', 'options', 'correctAnswer', 'authorId', 'authorEmail', 'authorName', 'status', 'votes', 'rejections', 'voters', 'timestamp']);
+      allow update: if isAuthenticated() && areImmutableFieldsUnchanged(['timestamp', 'authorId', 'question']) && hasOnlyAllowedFields(['courseCode', 'question', 'options', 'correctAnswer', 'authorId', 'authorEmail', 'authorName', 'status', 'votes', 'rejections', 'voters', 'timestamp']);
       allow delete: if isAuthenticated();
     }
 
