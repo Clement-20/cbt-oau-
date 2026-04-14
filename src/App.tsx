@@ -1,9 +1,9 @@
-import { HashRouter as Router, Routes, Route, Link, useLocation } from "react-router-dom";
+import { HashRouter as Router, Routes, Route, Link, useLocation, useNavigate } from "react-router-dom";
 import { ThemeProvider, useTheme } from "./components/theme-provider";
 import { getSettings, subscribeToSettings } from "./lib/settings";
 import { HelmetProvider, Helmet } from "react-helmet-async";
 import { useEffect, useState, Suspense, lazy } from "react";
-import { onAuthStateChanged, signInWithPopup, GoogleAuthProvider, signOut, browserPopupRedirectResolver, signInAnonymously } from "firebase/auth";
+import { onAuthStateChanged, signInWithPopup, GoogleAuthProvider, signOut, browserPopupRedirectResolver, signInAnonymously, signInWithRedirect, getRedirectResult } from "firebase/auth";
 import { auth, db } from "./firebase";
 import { doc, getDoc, setDoc, updateDoc } from "firebase/firestore";
 import { handleFirestoreError, OperationType } from "./utils/errorHandling";
@@ -29,7 +29,6 @@ const Community = lazy(() => import("./pages/Community"));
 const Verification = lazy(() => import("./pages/Verification"));
 const Resources = lazy(() => import("./pages/Resources"));
 const StudyMode = lazy(() => import("./pages/StudyMode"));
-const NotFound = lazy(() => import("./pages/NotFound"));
 
 import { ErrorBoundary } from "./components/ErrorBoundary";
 import LoadingLogo from "./components/LoadingLogo";
@@ -61,11 +60,27 @@ function MainApp() {
   const [studyDeckPrompt, setStudyDeckPrompt] = useState<string | undefined>();
   const { theme, setTheme } = useTheme();
   const location = useLocation();
+  const navigate = useNavigate();
   const isAIChatPage = location.pathname === "/validate" || location.pathname === "/cbt";
 
   const [loginError, setLoginError] = useState<string | null>(null);
+  const [isLoggingIn, setIsLoggingIn] = useState(false);
 
   useEffect(() => {
+    // Handle redirect result
+    const checkRedirect = async () => {
+      try {
+        const result = await getRedirectResult(auth);
+        if (result) {
+          console.log("Redirect login successful", result.user);
+        }
+      } catch (error: any) {
+        console.error("Redirect login failed", error);
+        setLoginError(`Redirect login failed: ${error.message || String(error)}`);
+      }
+    };
+    checkRedirect();
+
     const handleOpenAI = (e: any) => {
       if (e.detail) {
         setStudyDeckContext(e.detail.contextText);
@@ -97,11 +112,12 @@ function MainApp() {
     });
 
     const unsubscribeAuth = onAuthStateChanged(auth, async (currentUser) => {
-      setUser(currentUser);
-      if (currentUser) {
-        try {
+      try {
+        setUser(currentUser);
+        if (currentUser) {
           const userRef = doc(db, "users", currentUser.uid);
           const userSnap = await getDoc(userRef);
+          
           if (!userSnap.exists()) {
             const newUserData = currentUser.isAnonymous ? {
               uid: currentUser.uid,
@@ -142,12 +158,12 @@ function MainApp() {
             await setDoc(userRef, newUserData);
             setDbUser(newUserData);
             if (!currentUser.isAnonymous) {
-              window.location.href = "/setup";
+              navigate("/setup");
             }
           } else {
             let userData = userSnap.data();
-            if (!currentUser.isAnonymous && !userData.matricNumber && window.location.pathname !== "/setup") {
-              window.location.href = "/setup";
+            if (!currentUser.isAnonymous && !userData.matricNumber && location.pathname !== "/setup") {
+              navigate("/setup");
             }
             const now = Date.now();
             const shanaPeriodStart = userData.shanaPeriodStart || now;
@@ -185,13 +201,15 @@ function MainApp() {
               setDbUser((prev: any) => prev ? { ...prev, currentStreak: newStreak } : prev);
             });
           }
-        } catch (error) {
-          handleFirestoreError(error, OperationType.GET, "users");
-        } finally {
-          setLoading(false);
+        } else {
+          setDbUser(null);
         }
-      } else {
-        setDbUser(null);
+      } catch (error) {
+        console.error("Auth state error:", error);
+        if (currentUser) {
+          handleFirestoreError(error, OperationType.GET, "users");
+        }
+      } finally {
         setLoading(false);
       }
     });
@@ -203,6 +221,7 @@ function MainApp() {
 
   const login = async () => {
     setLoginError(null);
+    setIsLoggingIn(true);
     const provider = new GoogleAuthProvider();
     provider.setCustomParameters({
       prompt: 'select_account'
@@ -211,11 +230,33 @@ function MainApp() {
       await signInWithPopup(auth, provider, browserPopupRedirectResolver);
     } catch (error: any) {
       console.error("Login failed", error);
-      if (error.code === 'auth/network-request-failed') {
+      console.error("Firebase Auth Error Code:", error.code);
+      
+      // Fallback to redirect if popup is blocked or fails
+      const isPopupError = error.code === 'auth/popup-blocked' || 
+                          error.code === 'auth/cancelled-popup-request' || 
+                          error.code === 'auth/popup-closed-by-user';
+
+      if (isPopupError) {
+        try {
+          console.log("Popup issue detected (closed or blocked), falling back to redirect...");
+          // Show a helpful message while redirecting
+          setLoginError("Popup was closed or blocked. Switching to a more compatible login method... Please wait.");
+          await signInWithRedirect(auth, provider);
+          return; // Redirect will happen
+        } catch (redirectError: any) {
+          console.error("Redirect fallback failed", redirectError);
+          setLoginError(`Login failed: Popup was closed/blocked and redirect also failed. ${redirectError.message || String(redirectError)}`);
+        }
+      } else if (error.code === 'auth/network-request-failed') {
         setLoginError("Login failed: Network error. This is often caused by ad blockers, privacy extensions (like Privacy Badger or Brave Shields), or disabled third-party cookies. Please disable them for this site and try again, or open the app in a new tab.");
       } else {
         setLoginError(`Login failed: ${error.message || String(error)}`);
       }
+    } finally {
+      // Only clear loading state if we didn't trigger a redirect
+      // If we did trigger a redirect, the page will reload anyway
+      setIsLoggingIn(false);
     }
   };
 
@@ -357,8 +398,22 @@ function MainApp() {
                 </button>
               </div>
             ) : (
-              <button onClick={login} className="flex items-center gap-2 bg-blue-600 text-white px-5 py-2 rounded-full text-sm font-medium hover:bg-blue-700 transition-colors shadow-md">
-                <LogIn size={16} /> Sign In
+              <button 
+                onClick={login} 
+                disabled={isLoggingIn}
+                className="flex items-center gap-2 bg-blue-600 text-white px-5 py-2 rounded-full text-sm font-medium hover:bg-blue-700 transition-colors shadow-md disabled:opacity-70 disabled:cursor-not-allowed"
+              >
+                {isLoggingIn ? (
+                  <>
+                    <Loader2 className="animate-spin" size={16} />
+                    <span>Signing in...</span>
+                  </>
+                ) : (
+                  <>
+                    <LogIn size={16} />
+                    <span>Sign In</span>
+                  </>
+                )}
               </button>
             )}
 
@@ -416,7 +471,7 @@ function MainApp() {
         )}
         <Suspense fallback={<LoadingFallback />}>
           <Routes>
-            <Route path="/" element={<Home user={user} />} />
+            <Route path="/" element={<Home user={user} login={login} isLoggingIn={isLoggingIn} />} />
             <Route path="/admin-dashboard" element={<Admin user={user} />} />
             <Route path="/icepab-admin" element={<Admin user={user} />} />
             <Route path="/cbt" element={<CBT user={user} isFocusMode={isFocusMode} setIsFocusMode={setIsFocusMode} />} />
@@ -431,7 +486,6 @@ function MainApp() {
             <Route path="/verification" element={<Verification user={user} />} />
             <Route path="/resources" element={<Resources user={user} />} />
             <Route path="/study-mode" element={<StudyMode user={user} />} />
-            <Route path="*" element={<NotFound />} />
           </Routes>
         </Suspense>
       </main>

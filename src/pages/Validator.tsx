@@ -1,19 +1,24 @@
-import React, { useState, useEffect } from "react";
-import { collection, addDoc, serverTimestamp, query, onSnapshot, updateDoc, doc, increment, runTransaction, arrayUnion } from "firebase/firestore";
+import React, { useState, useRef, useEffect } from "react";
+import { collection, addDoc, serverTimestamp, query, onSnapshot, updateDoc, doc, increment, getDoc, setDoc, arrayUnion, runTransaction } from "firebase/firestore";
 import { handleFirestoreError, OperationType } from "../utils/errorHandling";
 import { db } from "../firebase";
-import { ShieldCheck, Plus, Check, X, Loader2, Share2, Trash2 } from "lucide-react";
+import { ShieldCheck, Upload, FileText, Check, X, Loader2, Share2, BatteryLow, Type as TypeIcon, Trash2 } from "lucide-react";
+import { GoogleGenAI, Type } from "@google/genai";
 import { Helmet } from "react-helmet-async";
 import { toast } from "../components/Toast";
+import { checkAndUseNexusEnergy } from "../utils/nexusUtils";
+import NexusEnergyModal from "../components/NexusEnergyModal";
 
 export default function Validator({ user }: { user: any }) {
+  const [file, setFile] = useState<File | null>(null);
   const [courseCode, setCourseCode] = useState("");
-  const [question, setQuestion] = useState("");
-  const [options, setOptions] = useState(["", "", "", ""]);
-  const [correctAnswer, setCorrectAnswer] = useState<number>(0);
   const [isProcessing, setIsProcessing] = useState(false);
   const [pendingQuestions, setPendingQuestions] = useState<any[]>([]);
+  const [showEnergyModal, setShowEnergyModal] = useState(false);
+  const [uploadMode, setUploadMode] = useState<"file" | "text">("file");
+  const [manualText, setManualText] = useState("");
   const [isLoadingQuestions, setIsLoadingQuestions] = useState(true);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const isAdmin = user?.email === "banmekeifeoluwa@gmail.com";
 
@@ -34,69 +39,177 @@ export default function Validator({ user }: { user: any }) {
     return () => unsub();
   }, [user]);
 
-  const handleOptionChange = (index: number, value: string) => {
-    const newOptions = [...options];
-    newOptions[index] = value;
-    setOptions(newOptions);
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files[0]) {
+      const selectedFile = e.target.files[0];
+      setFile(selectedFile);
+    }
   };
 
-  const submitQuestion = async () => {
-    if (!courseCode.trim() || !question.trim() || options.some(opt => !opt.trim()) || !user) {
-      toast("❌ Please fill in all fields");
-      return;
-    }
-
-    // Validate input lengths
-    if (courseCode.length > 20) {
-      toast("❌ Course code too long (max 20 characters)");
-      return;
-    }
-    if (question.length > 1000) {
-      toast("❌ Question too long (max 1000 characters)");
-      return;
-    }
-    if (options.some(opt => opt.length > 500)) {
-      toast("❌ Option text too long (max 500 characters each)");
-      return;
-    }
-
+  const processUpload = async () => {
+    if ((uploadMode === "file" && !file) || (uploadMode === "text" && !manualText) || !courseCode || !user) return;
     setIsProcessing(true);
 
     try {
-      // Save to pending_questions collection
-      const docRef = await addDoc(collection(db, "pending_questions"), {
-        courseCode: courseCode.toUpperCase().slice(0, 20),
-        question: question.trim().slice(0, 1000),
-        options: options.map(opt => opt.trim().slice(0, 500)),
-        correctAnswer: parseInt(correctAnswer.toString()),
-        authorId: user.uid,
-        authorEmail: user.email,
-        authorName: user.displayName || "Anonymous",
-        votes: 0,
-        rejections: 0,
-        voters: [],
-        status: "pending",
-        timestamp: serverTimestamp()
+      let textToProcess = "";
+
+      if (uploadMode === "file" && file) {
+        // 1. Check Cache
+        const cacheKey = `nexus_extract_${file.name}_${file.size}`;
+        const cached = localStorage.getItem(cacheKey);
+        if (cached) {
+          const extractedQuestions = JSON.parse(cached);
+          await saveQuestions(extractedQuestions);
+          return;
+        }
+
+        if (file.type === "text/plain") {
+          textToProcess = await file.text();
+        } else {
+          // Process Image/PDF with Gemini
+          const { allowed } = await checkAndUseNexusEnergy(user.uid);
+          if (!allowed) {
+            setShowEnergyModal(true);
+            setIsProcessing(false);
+            return;
+          }
+
+          const reader = new FileReader();
+          reader.readAsDataURL(file);
+          reader.onload = async () => {
+            const base64Data = (reader.result as string).split(",")[1];
+            const mimeType = file.type;
+            await callGemini(base64Data, mimeType, cacheKey, undefined, courseCode);
+          };
+          return;
+        }
+      } else {
+        textToProcess = manualText;
+      }
+
+      // If we have text (from .txt or manual input), use Gemini to structure it
+      const { allowed } = await checkAndUseNexusEnergy(user.uid);
+      if (!allowed) {
+        setShowEnergyModal(true);
+        setIsProcessing(false);
+        return;
+      }
+      await callGemini(null, null, null, textToProcess, courseCode);
+
+    } catch (error) {
+      console.error("Error processing file:", error);
+      toast("Failed to process. Please try again.");
+      setIsProcessing(false);
+    }
+  };
+
+  const callGemini = async (base64Data: string | null, mimeType: string | null, cacheKey: string | null, rawText?: string, targetCourse?: string) => {
+    try {
+      const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+      const parts: any[] = [];
+      if (base64Data && mimeType) {
+        parts.push({ inlineData: { data: base64Data, mimeType } });
+      }
+      
+      const prompt = `
+        You are an expert academic validator for OAU students. 
+        
+        RESTRICTIONS:
+        1. You are strictly restricted to academic topics related to OAU (Obafemi Awolowo University).
+        2. If asked for confidential information (e.g., personal user data, private keys, passwords, student records, etc.), you MUST refuse to answer and output a JSON with a single field: "securityAlert": "Confidential information request detected".
+        3. If asked about the app, you may answer: "It was developed by Clement IfeOluwa ❄️ 🧊".
+        4. If the request is NOT academic or related to the app, refuse to answer.
+
+        TASK:
+        1. First, verify if the provided ${rawText ? 'text' : 'material'} contains academic questions related to the course code: ${targetCourse}.
+        2. If it does NOT contain relevant questions, return an empty array [].
+        3. If it DOES, extract all multiple-choice questions exactly as they appear in the material.
+        4. Do NOT make up questions. Only extract what is there.
+        5. For each question, extract:
+           - The question text.
+           - Exactly 4 options.
+           - The correct answer index (0-3). If the correct answer is not indicated, use your knowledge to determine it.
+        
+        ${rawText ? `RAW TEXT TO PROCESS: ${rawText}` : ''}
+        
+        RETURN FORMAT: A JSON array of objects.
+      `;
+
+      parts.push({ text: prompt });
+
+      const response = await ai.models.generateContent({
+        model: "gemini-3.1-pro-preview",
+        contents: { parts },
+        config: {
+          responseMimeType: "application/json",
+          responseSchema: {
+            type: Type.ARRAY,
+            items: {
+              type: Type.OBJECT,
+              properties: {
+                question: { type: Type.STRING },
+                options: { type: Type.ARRAY, items: { type: Type.STRING } },
+                correctAnswer: { type: Type.INTEGER }
+              },
+              required: ["question", "options", "correctAnswer"]
+            }
+          }
+        }
       });
 
-      toast(`✅ Question submitted! ID: ${docRef.id.substring(0, 8)}. Needs 20 votes to approve or 10 rejects to remove.`);
+      const extractedQuestions = JSON.parse(response.text || "[]");
       
-      // Reset form
-      setCourseCode("");
-      setQuestion("");
-      setOptions(["", "", "", ""]);
-      setCorrectAnswer(0);
-      setIsProcessing(false);
-    } catch (error: any) {
-      console.error("Upload error:", error);
-      const errorMsg = error?.message || "Unknown error";
-      if (errorMsg.includes("permission")) {
-        toast("❌ Permission denied. Make sure you're logged in.");
-      } else if (errorMsg.includes("missing")) {
-        toast("❌ Missing required fields.");
-      } else {
-        toast(`❌ Upload failed: ${errorMsg.substring(0, 100)}`);
+      if (extractedQuestions.securityAlert) {
+        await addDoc(collection(db, "security_alerts"), {
+          userId: user.uid,
+          alert: extractedQuestions.securityAlert,
+          timestamp: serverTimestamp()
+        });
+        toast("Security alert: Confidential information request detected.");
+        setIsProcessing(false);
+        return;
       }
+
+      if (extractedQuestions.length === 0) {
+        toast(`No relevant questions found for ${targetCourse}. Please check your material.`);
+        setIsProcessing(false);
+        return;
+      }
+
+      if (cacheKey) localStorage.setItem(cacheKey, JSON.stringify(extractedQuestions));
+      await saveQuestions(extractedQuestions);
+    } catch (error) {
+      console.error("Gemini Error:", error);
+      toast("AI processing failed. Please ensure the material is clear.");
+      setIsProcessing(false);
+    }
+  };
+
+  const saveQuestions = async (questions: any[]) => {
+    try {
+      for (const q of questions) {
+        await addDoc(collection(db, "pending_questions"), {
+          courseCode: courseCode.toUpperCase(),
+          question: q.question,
+          options: q.options,
+          correctAnswer: q.correctAnswer,
+          authorId: user.uid,
+          authorEmail: user.email,
+          authorName: user.displayName,
+          votes: 0,
+          voters: [],
+          status: "pending",
+          timestamp: serverTimestamp()
+        });
+      }
+
+      setFile(null);
+      setCourseCode("");
+      if (fileInputRef.current) fileInputRef.current.value = "";
+      toast(`Successfully extracted ${questions.length} questions for validation!`);
+      setIsProcessing(false);
+    } catch (error) {
+      handleFirestoreError(error, OperationType.CREATE, "pending_questions");
       setIsProcessing(false);
     }
   };
@@ -123,17 +236,10 @@ export default function Validator({ user }: { user: any }) {
         }
 
         const newVotes = (data.votes || 0) + (isLegit ? 1 : -1);
-        const newRejections = isLegit ? (data.rejections || 0) : (data.rejections || 0) + 1;
         const newVoters = [...(data.voters || []), user.uid];
 
-        // ✅ AUTO-DELETE if 10 rejects
-        if (newRejections >= 10) {
-          transaction.delete(qRef);
-          return;
-        }
-
-        // ✅ AUTO-APPROVE if 20 votes or admin
         if (newVotes >= 20 || isAdmin) {
+          // Approve and move to courses collection
           const courseRef = doc(db, "courses", data.courseCode);
           const courseSnap = await transaction.get(courseRef);
           
@@ -141,9 +247,7 @@ export default function Validator({ user }: { user: any }) {
             question: data.question,
             options: data.options,
             correctAnswer: data.correctAnswer,
-            id: qDoc.id,
-            addedBy: data.authorName,
-            addedAt: new Date().toISOString()
+            id: qDoc.id
           };
 
           if (courseSnap.exists()) {
@@ -152,24 +256,23 @@ export default function Validator({ user }: { user: any }) {
             });
           } else {
             transaction.set(courseRef, {
-              code: data.courseCode,
               title: `${data.courseCode} (Community)`,
-              description: "Community verified questions.",
+              description: "Course generated from validated questions.",
               questions: [newQuestion]
             });
           }
           
-          // ✅ AUTO-DELETE after approval
-          transaction.delete(qRef);
-          return;
+          transaction.update(qRef, { 
+            status: "approved",
+            voters: newVoters,
+            votes: newVotes
+          });
+        } else {
+          transaction.update(qRef, {
+            votes: newVotes,
+            voters: newVoters
+          });
         }
-
-        // Update votes/rejections
-        transaction.update(qRef, {
-          votes: newVotes,
-          rejections: newRejections,
-          voters: newVoters
-        });
       });
       
       if (isAdmin) {
@@ -203,218 +306,180 @@ export default function Validator({ user }: { user: any }) {
   };
 
   if (!user) {
-    return <div className="flex items-center justify-center h-screen text-gray-500">Please log in to validate questions.</div>;
+    return (
+      <div className="flex flex-col items-center justify-center py-20 text-center">
+        <ShieldCheck size={64} className="text-emerald-500 mb-4 drop-shadow-lg" />
+        <h1 className="text-3xl font-bold tracking-tight">Access Denied</h1>
+        <p className="text-[var(--foreground)]/60 mt-2 font-medium">Sign in to access the Validator.</p>
+      </div>
+    );
   }
 
   return (
-    <>
+    <div className="space-y-8 max-w-6xl mx-auto">
       <Helmet>
-        <title>Question Validator - ICEPAB Nexus</title>
-        <meta name="description" content="Manually submit and validate academic questions on the ICEPAB Nexus Validator." />
-        <meta property="og:title" content="Question Validator" />
-        <meta property="og:description" content="Submit and validate questions for the community." />
+        <title>Validator | ICEPAB Nexus</title>
+        <meta name="description" content="Upload materials, let AI parse them, and crowdsource verification on the ICEPAB Nexus Validator." />
       </Helmet>
+      <div>
+        <h1 className="text-3xl font-bold tracking-tighter flex items-center gap-3">
+          <ShieldCheck className="text-emerald-600 dark:text-emerald-500" /> Validator
+        </h1>
+        <p className="text-[var(--foreground)]/60 mt-2 font-medium">Upload materials, let AI parse them, and crowdsource verification.</p>
+      </div>
 
-      <div className="min-h-screen bg-[var(--background)] pt-24 pb-16 px-4">
-        <div className="max-w-4xl mx-auto">
-          {/* Header */}
-          <div className="mb-8">
-            <div className="flex items-center gap-3 mb-4">
-              <ShieldCheck size={32} className="text-emerald-600 dark:text-emerald-500" />
-              <h1 className="text-3xl font-bold text-[var(--foreground)]">Submit & Validate Questions</h1>
+      <div className="grid lg:grid-cols-2 gap-8">
+        {/* Upload Section */}
+        <div className="glass-panel p-8 rounded-3xl shadow-sm space-y-6 h-fit">
+          <div className="flex items-center justify-between">
+            <h2 className="text-2xl font-bold flex items-center gap-2">
+              <Upload size={24} className="text-emerald-600 dark:text-emerald-500" /> Submit Questions
+            </h2>
+            <div className="flex bg-black/5 dark:bg-white/5 p-1 rounded-xl">
+              <button 
+                onClick={() => setUploadMode("file")}
+                className={`px-4 py-1.5 rounded-lg text-xs font-bold transition-all ${uploadMode === "file" ? 'bg-emerald-600 text-white shadow-md' : 'text-[var(--foreground)]/60 hover:text-[var(--foreground)]'}`}
+              >
+                File
+              </button>
+              <button 
+                onClick={() => setUploadMode("text")}
+                className={`px-4 py-1.5 rounded-lg text-xs font-bold transition-all ${uploadMode === "text" ? 'bg-emerald-600 text-white shadow-md' : 'text-[var(--foreground)]/60 hover:text-[var(--foreground)]'}`}
+              >
+                Text
+              </button>
             </div>
-            <p className="text-[var(--foreground)]/60 mt-2 font-medium">
-              Submit questions manually. They need 20 user validations to join the question bank.
-            </p>
           </div>
-
-          {/* Submit Form */}
-          <div className="bg-[var(--card)]/50 border border-[var(--foreground)]/10 rounded-xl p-6 mb-8">
-            <h2 className="text-xl font-bold mb-6 text-[var(--foreground)]">Add New Question</h2>
-            
-            {/* Course Code */}
-            <div className="mb-4">
-              <label className="block text-sm font-semibold text-[var(--foreground)] mb-2">
-                Course Code (e.g., GST101)
-              </label>
+          
+          <div className="space-y-5">
+            <div>
+              <label className="block text-sm font-bold text-[var(--foreground)]/80 mb-2">Course Code</label>
               <input
                 type="text"
+                placeholder="e.g. MTH 101"
                 value={courseCode}
-                onChange={(e) => setCourseCode(e.target.value.toUpperCase())}
-                placeholder="GST101"
-                className="w-full px-4 py-2 bg-[var(--background)] border border-[var(--foreground)]/20 rounded-lg text-[var(--foreground)] placeholder-[var(--foreground)]/40 focus:ring-2 focus:ring-emerald-500 outline-none transition"
+                onChange={(e) => setCourseCode(e.target.value)}
+                className="w-full bg-black/5 dark:bg-black/50 border border-[var(--border)] rounded-2xl p-4 text-[var(--foreground)] placeholder:text-[var(--foreground)]/30 focus:outline-none focus:ring-2 focus:ring-emerald-500 uppercase font-medium transition-all"
               />
             </div>
-
-            {/* Question Text */}
-            <div className="mb-4">
-              <label className="block text-sm font-semibold text-[var(--foreground)] mb-2">
-                Question
-              </label>
-              <textarea
-                value={question}
-                onChange={(e) => setQuestion(e.target.value)}
-                placeholder="Enter the question text here..."
-                className="w-full px-4 py-2 bg-[var(--background)] border border-[var(--foreground)]/20 rounded-lg text-[var(--foreground)] placeholder-[var(--foreground)]/40 focus:ring-2 focus:ring-emerald-500 outline-none transition resize-none"
-                rows={3}
-              />
-            </div>
-
-            {/* Options */}
-            <div className="mb-6">
-              <label className="block text-sm font-semibold text-[var(--foreground)] mb-2">
-                Options (Required: Exactly 4)
-              </label>
-              <div className="space-y-2">
-                {options.map((opt, idx) => (
-                  <div key={idx} className="flex items-center gap-2">
-                    <span className="w-8 h-8 flex items-center justify-center rounded-full bg-emerald-600 text-white text-sm font-bold">
-                      {String.fromCharCode(65 + idx)}
-                    </span>
-                    <input
-                      type="text"
-                      value={opt}
-                      onChange={(e) => handleOptionChange(idx, e.target.value)}
-                      placeholder={`Option ${String.fromCharCode(65 + idx)}`}
-                      className="flex-1 px-4 py-2 bg-[var(--background)] border border-[var(--foreground)]/20 rounded-lg text-[var(--foreground)] placeholder-[var(--foreground)]/40 focus:ring-2 focus:ring-emerald-500 outline-none transition"
-                    />
-                    {correctAnswer === idx && (
-                      <span className="px-3 py-2 bg-emerald-600 text-white text-xs font-bold rounded">
-                        ✓ Correct
-                      </span>
-                    )}
-                  </div>
-                ))}
+            
+            {uploadMode === "file" ? (
+              <div>
+                <label className="block text-sm font-bold text-[var(--foreground)]/80 mb-2">Material (Image/PDF/TXT)</label>
+                <input
+                  type="file"
+                  accept="image/*,application/pdf,text/plain"
+                  onChange={handleFileChange}
+                  ref={fileInputRef}
+                  className="w-full bg-black/5 dark:bg-black/50 border border-[var(--border)] rounded-2xl p-4 text-[var(--foreground)]/60 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-bold file:bg-emerald-500/10 file:text-emerald-600 dark:file:text-emerald-400 hover:file:bg-emerald-500/20 transition-all cursor-pointer"
+                />
               </div>
-            </div>
-
-            {/* Correct Answer Selection */}
-            <div className="mb-6">
-              <label className="block text-sm font-semibold text-[var(--foreground)] mb-2">
-                Select Correct Answer
-              </label>
-              <div className="flex gap-2">
-                {options.map((_, idx) => (
-                  <button
-                    key={idx}
-                    onClick={() => setCorrectAnswer(idx)}
-                    className={`w-10 h-10 flex items-center justify-center rounded-lg font-bold transition ${
-                      correctAnswer === idx
-                        ? 'bg-emerald-600 text-white'
-                        : 'bg-[var(--background)] border border-[var(--foreground)]/20 text-[var(--foreground)] hover:border-emerald-600'
-                    }`}
-                  >
-                    {String.fromCharCode(65 + idx)}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            {/* Submit Button */}
-            <button
-              onClick={submitQuestion}
-              disabled={isProcessing || !courseCode || !question || options.some(opt => !opt)}
-              className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-3 rounded-lg transition disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
-            >
-              {isProcessing ? (
-                <>
-                  <Loader2 size={20} className="animate-spin" />
-                  Submitting...
-                </>
-              ) : (
-                <>
-                  <Plus size={20} />
-                  Submit Question
-                </>
-              )}
-            </button>
-          </div>
-
-          {/* Pending Questions */}
-          <div>
-            <h2 className="text-2xl font-bold text-[var(--foreground)] mb-6">
-              Pending Validation ({pendingQuestions.filter(q => q.status !== 'deleted').length})
-            </h2>
-
-            {isLoadingQuestions ? (
-              <div className="text-center py-12">
-                <Loader2 className="inline animate-spin text-emerald-600" size={32} />
-              </div>
-            ) : pendingQuestions.filter(q => q.status !== 'deleted').length === 0 ? (
-              <p className="text-center text-[var(--foreground)]/60 py-8">No pending questions yet. Be the first to submit!</p>
             ) : (
-              <div className="space-y-4">
-                {pendingQuestions.filter(q => q.status !== 'deleted').map((q) => (
-                  <div key={q.id} className="bg-[var(--card)]/50 border border-[var(--foreground)]/10 rounded-lg p-6">
-                    <div className="flex justify-between items-start mb-4">
-                      <div>
-                        <span className="text-xs font-bold text-emerald-600 dark:text-emerald-400">
-                          {q.courseCode}
-                        </span>
-                        <h3 className="text-lg font-bold text-[var(--foreground)] mt-2">{q.question}</h3>
-                      </div>
-                      <div className="text-center">
-                        <div className="text-2xl font-bold text-emerald-600">{q.votes || 0}</div>
-                        <div className="text-xs text-[var(--foreground)]/60">votes</div>
-                        <div className="text-xs text-[var(--foreground)]/60 mt-1">Need: {Math.max(0, 20 - (q.votes || 0))}</div>
-                      </div>
-                    </div>
-
-                    <div className="space-y-2 mb-4">
-                      {q.options.map((opt: string, idx: number) => (
-                        <div
-                          key={idx}
-                          className={`p-3 rounded-lg ${
-                            idx === q.correctAnswer
-                              ? 'bg-emerald-600/20 border border-emerald-600/50'
-                              : 'bg-[var(--background)] border border-[var(--foreground)]/10'
-                          }`}
-                        >
-                          <span className="font-bold">{String.fromCharCode(65 + idx)}:</span> {opt}
-                          {idx === q.correctAnswer && <span className="ml-2 text-emerald-600 font-bold">✓ Correct</span>}
-                        </div>
-                      ))}
-                    </div>
-
-                    <div className="flex flex-wrap gap-2 items-center">
-                      <button
-                        onClick={() => voteQuestion(q, true)}
-                        className="flex items-center gap-1 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg font-semibold transition"
-                      >
-                        <Check size={18} /> Verify
-                      </button>
-                      <button
-                        onClick={() => voteQuestion(q, false)}
-                        className="flex items-center gap-1 px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg font-semibold transition"
-                      >
-                        <X size={18} /> Reject
-                      </button>
-                      <button
-                        onClick={() => inviteToVerify(q)}
-                        className="flex items-center gap-1 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-semibold transition"
-                      >
-                        <Share2 size={18} /> Invite
-                      </button>
-                      {isAdmin && (
-                        <button
-                          onClick={() => deleteQuestion(q.id)}
-                          className="flex items-center gap-1 px-4 py-2 bg-gray-600 hover:bg-gray-700 text-white rounded-lg font-semibold transition ml-auto"
-                        >
-                          <Trash2 size={18} /> Delete
-                        </button>
-                      )}
-                    </div>
-
-                    <div className="mt-4 text-sm text-[var(--foreground)]/60">
-                      By: {q.authorName} ({q.courseCode})
-                    </div>
-                  </div>
-                ))}
+              <div>
+                <label className="block text-sm font-bold text-[var(--foreground)]/80 mb-2">Paste Questions</label>
+                <textarea
+                  placeholder="Paste your questions here. AI will structure them for you..."
+                  value={manualText}
+                  onChange={(e) => setManualText(e.target.value)}
+                  className="w-full bg-black/5 dark:bg-black/50 border border-[var(--border)] rounded-2xl p-4 text-[var(--foreground)] placeholder:text-[var(--foreground)]/30 focus:outline-none focus:ring-2 focus:ring-emerald-500 h-32 font-medium transition-all resize-none"
+                />
               </div>
             )}
+
+            <button
+              onClick={processUpload}
+              disabled={isProcessing || (uploadMode === "file" ? !file : !manualText) || !courseCode}
+              className="w-full flex items-center justify-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white px-6 py-4 rounded-2xl font-bold transition-all shadow-md disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {isProcessing ? <><Loader2 className="animate-spin" size={20} /> Processing...</> : "Submit for Validation"}
+            </button>
           </div>
         </div>
+
+        {/* Validation Queue */}
+        <div className="space-y-4">
+          <h2 className="text-2xl font-bold flex items-center gap-2">
+            <FileText size={24} className="text-emerald-600 dark:text-emerald-500" /> Validation Queue
+          </h2>
+          
+          {isLoadingQuestions ? (
+            <div className="space-y-4">
+              {[1, 2, 3].map(i => (
+                <div key={i} className="glass-panel p-6 rounded-2xl space-y-4 animate-pulse">
+                  <div className="flex justify-between">
+                    <div className="h-6 bg-black/10 dark:bg-white/10 rounded w-20"></div>
+                    <div className="h-6 bg-black/10 dark:bg-white/10 rounded w-32"></div>
+                  </div>
+                  <div className="h-6 bg-black/5 dark:bg-white/5 rounded w-full"></div>
+                  <div className="grid grid-cols-2 gap-3">
+                    {[1, 2, 3, 4].map(j => (
+                      <div key={j} className="h-10 bg-black/5 dark:bg-white/5 rounded-xl"></div>
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : pendingQuestions.filter(q => q.status === "pending").length === 0 ? (
+            <div className="glass-panel p-12 rounded-3xl text-center text-[var(--foreground)]/50 font-medium border-dashed border-2">
+              No pending questions. Upload some materials!
+            </div>
+          ) : (
+            <div className="space-y-4 max-h-[600px] overflow-y-auto pr-2 custom-scrollbar">
+              {pendingQuestions.filter(q => q.status === "pending").map((q) => (
+                <div key={q.id} className="glass-panel p-6 rounded-2xl space-y-4 shadow-sm hover:shadow-md transition-shadow relative">
+                  <div className="flex justify-between items-start">
+                    <span className="text-xs font-bold bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 px-3 py-1 rounded-full">{q.courseCode}</span>
+                    <div className="flex items-center gap-2">
+                      {isAdmin && (
+                        <button 
+                          onClick={() => deleteQuestion(q.id)}
+                          className="p-1.5 bg-red-500/10 text-red-500 rounded-lg hover:bg-red-500/20 transition-colors"
+                          title="Delete Question"
+                        >
+                          <Trash2 size={14} />
+                        </button>
+                      )}
+                      <button 
+                        onClick={() => inviteToVerify(q)}
+                        className="text-xs font-bold flex items-center gap-1 bg-blue-500/10 text-blue-600 dark:text-blue-400 px-3 py-1 rounded-full hover:bg-blue-500/20 transition-colors"
+                        title="Invite people to verify"
+                      >
+                        <Share2 size={12} /> Invite
+                      </button>
+                      <span className="text-xs font-mono font-bold text-[var(--foreground)]/50 bg-black/5 dark:bg-white/10 px-3 py-1 rounded-full">Votes: {q.votes}/20</span>
+                    </div>
+                  </div>
+                  <p className="font-semibold text-lg leading-snug">{q.question}</p>
+                  <div className="grid grid-cols-2 gap-3 text-sm font-medium">
+                    {q.options.map((opt: string, idx: number) => (
+                      <div key={idx} className={`p-3 rounded-xl border transition-colors ${idx === q.correctAnswer ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-700 dark:text-emerald-300' : 'bg-black/5 dark:bg-black/30 border-[var(--border)] text-[var(--foreground)]/70'}`}>
+                        {opt}
+                      </div>
+                    ))}
+                  </div>
+                  <div className="flex gap-3 pt-3">
+                    <button 
+                      onClick={() => voteQuestion(q, true)} 
+                      disabled={q.voters?.includes(user?.uid)}
+                      className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-xl font-bold transition-colors ${q.voters?.includes(user?.uid) ? 'bg-black/5 dark:bg-white/5 text-[var(--foreground)]/30 cursor-not-allowed' : 'bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-700 dark:text-emerald-400'}`}
+                    >
+                      <Check size={18} /> Legit
+                    </button>
+                    <button 
+                      onClick={() => voteQuestion(q, false)} 
+                      disabled={q.voters?.includes(user?.uid)}
+                      className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-xl font-bold transition-colors ${q.voters?.includes(user?.uid) ? 'bg-black/5 dark:bg-white/5 text-[var(--foreground)]/30 cursor-not-allowed' : 'bg-red-500/10 hover:bg-red-500/20 text-red-700 dark:text-red-400'}`}
+                    >
+                      <X size={18} /> Flawed
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
       </div>
-    </>
+      {showEnergyModal && <NexusEnergyModal onClose={() => setShowEnergyModal(false)} />}
+    </div>
   );
 }

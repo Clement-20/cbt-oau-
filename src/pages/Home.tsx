@@ -10,7 +10,9 @@ import FlashcardEngine from "../components/FlashcardEngine";
 import ResourceVault from "../components/ResourceVault";
 import { Helmet } from "react-helmet-async";
 
-export default function Home({ user }: { user: any }) {
+import { Loader2 } from "lucide-react";
+
+export default function Home({ user, login, isLoggingIn }: { user: any, login?: () => void, isLoggingIn?: boolean }) {
   const [portalStatus, setPortalStatus] = useState<{ status: string; message: string }>({ status: "CHECKING...", message: "Pinging OAU Portal..." });
   const [motivation, setMotivation] = useState(getRandomMotivation());
   const [broadcast, setBroadcast] = useState<string | null>(null);
@@ -124,7 +126,23 @@ export default function Home({ user }: { user: any }) {
           <ShieldCheck className="shrink-0 mt-0.5" />
           <div>
             <p className="font-bold text-sm sm:text-base">Guest Mode Active</p>
-            <p className="text-sm mt-1 opacity-90">Progress is not saved to the Leaderboard. <button onClick={() => window.location.href = "/"} className="underline hover:no-underline font-bold">Connect Google Account</button></p>
+            <p className="text-sm mt-1 opacity-90">
+              Progress is not saved to the Leaderboard.{" "}
+              <button 
+                onClick={login} 
+                disabled={isLoggingIn}
+                className="underline hover:no-underline font-bold inline-flex items-center gap-1 disabled:opacity-50"
+              >
+                {isLoggingIn ? (
+                  <>
+                    <Loader2 className="animate-spin" size={12} />
+                    Connecting...
+                  </>
+                ) : (
+                  "Connect Google Account"
+                )}
+              </button>
+            </p>
           </div>
           <button 
             onClick={() => setShowGuestWarning(false)}

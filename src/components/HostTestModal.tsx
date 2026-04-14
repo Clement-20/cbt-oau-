@@ -3,6 +3,7 @@ import { collection, addDoc, serverTimestamp } from "firebase/firestore";
 import { db } from "../firebase";
 import { Course, Question } from "../lib/questions";
 import { X, Plus, Trash2, Upload, Loader2, FileText, BookOpen, BatteryLow } from "lucide-react";
+import { GoogleGenAI, Type } from "@google/genai";
 import { checkAndUseNexusEnergy } from "../utils/nexusUtils";
 import NexusEnergyModal from "./NexusEnergyModal";
 import { handleFirestoreError, OperationType } from "../utils/errorHandling";
@@ -93,40 +94,33 @@ export default function HostTestModal({ user, courses, onClose }: HostTestModalP
             const base64Data = (reader.result as string).split(",")[1];
             const mimeType = file.type;
 
-            // Call server endpoint with timeout
-            const controller = new AbortController();
-            const timeoutId = setTimeout(() => controller.abort(), 60000); // 60 second timeout
-            
-            let response;
-            try {
-              response = await fetch("/api/ai/extract-questions", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                  base64Data,
-                  mimeType,
-                  courseCode: pdfCourseCode.toUpperCase()
-                }),
-                signal: controller.signal
-              });
-            } finally {
-              clearTimeout(timeoutId);
-            }
+            const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+            const response = await ai.models.generateContent({
+              model: "gemini-3.1-pro-preview",
+              contents: {
+                parts: [
+                  { inlineData: { data: base64Data, mimeType } },
+                  { text: "Extract all multiple choice questions from this image/document. Return a JSON array of objects with 'question' (string), 'options' (array of 4 strings), and 'correctAnswer' (number 0-3)." }
+                ]
+              },
+              config: {
+                responseMimeType: "application/json",
+                responseSchema: {
+                  type: Type.ARRAY,
+                  items: {
+                    type: Type.OBJECT,
+                    properties: {
+                      question: { type: Type.STRING },
+                      options: { type: Type.ARRAY, items: { type: Type.STRING } },
+                      correctAnswer: { type: Type.INTEGER }
+                    },
+                    required: ["question", "options", "correctAnswer"]
+                  }
+                }
+              }
+            });
 
-            if (!response.ok) {
-              const errorData = await response.json().catch(() => ({ error: response.statusText }));
-              throw new Error(errorData.error || `Server error: ${response.statusText}`);
-            }
-
-            const data = await response.json();
-
-            if (data.error) {
-              setError(data.error);
-              setIsSubmitting(false);
-              return;
-            }
-
-            const extractedQuestions = data.questions || [];
+            const extractedQuestions = JSON.parse(response.text || "[]");
             
             if (extractedQuestions.length === 0) {
               setError("No questions could be extracted from the file.");
@@ -318,8 +312,8 @@ export default function HostTestModal({ user, courses, onClose }: HostTestModalP
             {isSubmitting ? <><Loader2 className="animate-spin" size={18} /> {mode === "pdf" ? "Processing..." : "Hosting..."}</> : "Start Hosting"}
           </button>
         </form>
-        {showEnergyModal && <NexusEnergyModal onClose={() => setShowEnergyModal(false)} />}
       </div>
+      {showEnergyModal && <NexusEnergyModal onClose={() => setShowEnergyModal(false)} />}
     </div>
   );
 }

@@ -11,7 +11,6 @@ interface AcademicState {
   toggleLike: (resourceId: string) => void;
   toggleDislike: (resourceId: string) => void;
   incrementAIUsage: () => void;
-  resetAIUsage: () => void;
 }
 
 export const useAcademicStore = create<AcademicState>()(
@@ -55,8 +54,6 @@ export const useAcademicStore = create<AcademicState>()(
         }),
       incrementAIUsage: () => 
         set((state) => ({ aiExplanationsUsed: state.aiExplanationsUsed + 1 })),
-      resetAIUsage: () =>
-        set(() => ({ aiExplanationsUsed: 0 })),
     }),
     {
       name: 'nexus-academic-store',

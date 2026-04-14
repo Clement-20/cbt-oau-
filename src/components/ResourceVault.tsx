@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, useMemo } from "react";
 import { Upload, FileText, Download, Search, Trash2, X, Loader2, ThumbsUp, ThumbsDown, UserPlus, UserMinus, Filter, ChevronDown, BookOpen, Clock, Star, ExternalLink, Image as ImageIcon, File as FileIcon, User } from "lucide-react";
 import { collection, onSnapshot, query, orderBy, addDoc, serverTimestamp, deleteDoc, doc, getDocs, where, updateDoc, increment, limit, startAfter, getDoc, QueryDocumentSnapshot } from "firebase/firestore";
-import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
+import { ref, uploadBytesResumable, getDownloadURL } from "firebase/storage";
 import { db, storage, auth } from "../firebase";
 import { toast } from "./Toast";
 import ConfirmModal from "./ConfirmModal";
@@ -35,6 +35,7 @@ export default function ResourceMarketplace({ user, isAdmin }: { user?: any, isA
   const [newResource, setNewResource] = useState<{title: string, type: "PDF" | "Image" | "Link", url: string, course: string}>({ title: "", type: "PDF", url: "", course: "" });
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [isUploading, setIsUploading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
   const [lastDoc, setLastDoc] = useState<QueryDocumentSnapshot | null>(null);
   const [hasMore, setHasMore] = useState(true);
@@ -56,7 +57,7 @@ export default function ResourceMarketplace({ user, isAdmin }: { user?: any, isA
           setUserCourses(codes);
         }
       } catch (error) {
-        console.error("Failed to fetch user courses", error);
+        handleFirestoreError(error, OperationType.GET, "user_cgpa");
       }
     };
     fetchUserCourses();
@@ -134,49 +135,60 @@ export default function ResourceMarketplace({ user, isAdmin }: { user?: any, isA
     }
 
     setIsUploading(true);
+    setUploadProgress(0);
     try {
       let finalUrl = "";
       
       if (newResource.type === "Image" && selectedFile) {
-        // Try Cloudinary first if configured, fallback to Firebase Storage
-        const cloudName = process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME;
-        const uploadPreset = process.env.NEXT_PUBLIC_CLOUDINARY_UPLOAD_PRESET;
-
-        if (cloudName && uploadPreset) {
-          try {
-            const formData = new FormData();
-            formData.append("file", selectedFile);
-            formData.append("upload_preset", uploadPreset);
-            
-            const response = await fetch(`https://api.cloudinary.com/v1_1/${cloudName}/image/upload`, {
-              method: "POST",
-              body: formData
-            });
-            
-            if (response.ok) {
-              const data = await response.json();
-              finalUrl = data.secure_url;
-            } else {
-              throw new Error("Cloudinary upload failed");
-            }
-          } catch (err) {
-            console.warn("Cloudinary upload failed, falling back to Firebase Storage", err);
-            // Fallback to Firebase Storage
-            const storageRef = ref(storage, `resources/images/${user.uid}_${Date.now()}_${selectedFile.name}`);
-            await uploadBytes(storageRef, selectedFile);
-            finalUrl = await getDownloadURL(storageRef);
-          }
-        } else {
-          // No Cloudinary config, use Firebase Storage
-          const storageRef = ref(storage, `resources/images/${user.uid}_${Date.now()}_${selectedFile.name}`);
-          await uploadBytes(storageRef, selectedFile);
-          finalUrl = await getDownloadURL(storageRef);
+        // Cloudinary Direct Upload
+        const formData = new FormData();
+        formData.append("file", selectedFile);
+        formData.append("upload_preset", "nexus_unsigned"); 
+        
+        const response = await fetch(`https://api.cloudinary.com/v1_1/digital-nexus/image/upload`, {
+          method: "POST",
+          body: formData
+        });
+        
+        if (!response.ok) {
+          const errorData = await response.json();
+          console.error("Cloudinary Error:", errorData);
+          throw new Error(`Cloudinary upload failed: ${errorData.error?.message || response.statusText}`);
         }
+        const data = await response.json();
+        finalUrl = data.secure_url;
       } else if (newResource.type === "PDF" && selectedFile) {
-        // Firebase Storage Upload for PDFs
+        // Firebase Storage Upload with Progress
         const storageRef = ref(storage, `resources/${user.uid}_${Date.now()}_${selectedFile.name}`);
-        await uploadBytes(storageRef, selectedFile);
-        finalUrl = await getDownloadURL(storageRef);
+        const uploadTask = uploadBytesResumable(storageRef, selectedFile);
+
+        finalUrl = await new Promise((resolve, reject) => {
+          uploadTask.on('state_changed', 
+            (snapshot) => {
+              const progress = (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
+              setUploadProgress(progress);
+              console.log('Upload is ' + progress + '% done');
+            }, 
+            (error) => {
+              console.error("Firebase Storage Upload Error:", error);
+              console.error("Error Code:", error.code);
+              console.error("Error Message:", error.message);
+              
+              if (error.code === 'storage/unauthorized') {
+                toast("Permission denied: Check Firebase Storage rules");
+              } else if (error.code === 'storage/canceled') {
+                toast("Upload canceled");
+              } else {
+                toast(`Upload failed: ${error.message}`);
+              }
+              reject(error);
+            }, 
+            async () => {
+              const downloadURL = await getDownloadURL(uploadTask.snapshot.ref);
+              resolve(downloadURL);
+            }
+          );
+        });
       } else {
         finalUrl = newResource.url;
       }
@@ -564,9 +576,24 @@ export default function ResourceMarketplace({ user, isAdmin }: { user?: any, isA
                 <button 
                   type="submit" 
                   disabled={isUploading}
-                  className="w-full bg-cyan-600 hover:bg-cyan-700 disabled:bg-cyan-800 disabled:cursor-not-allowed text-white py-5 rounded-2xl font-black uppercase tracking-widest transition-all flex items-center justify-center gap-2 shadow-xl shadow-cyan-500/20"
+                  className="w-full bg-cyan-600 hover:bg-cyan-700 disabled:bg-cyan-800 disabled:cursor-not-allowed text-white py-5 rounded-2xl font-black uppercase tracking-widest transition-all flex flex-col items-center justify-center gap-2 shadow-xl shadow-cyan-500/20"
                 >
-                  {isUploading ? <><Loader2 className="animate-spin" size={20} /> Processing...</> : "Publish to Marketplace"}
+                  {isUploading ? (
+                    <>
+                      <div className="flex items-center gap-2">
+                        <Loader2 className="animate-spin" size={20} /> 
+                        <span>{newResource.type === "PDF" ? `Uploading ${Math.round(uploadProgress)}%` : "Processing..."}</span>
+                      </div>
+                      {newResource.type === "PDF" && (
+                        <div className="w-full bg-white/20 h-1 rounded-full mt-2 overflow-hidden">
+                          <div 
+                            className="bg-white h-full transition-all duration-300" 
+                            style={{ width: `${uploadProgress}%` }}
+                          />
+                        </div>
+                      )}
+                    </>
+                  ) : "Publish to Marketplace"}
                 </button>
               </form>
             </motion.div>

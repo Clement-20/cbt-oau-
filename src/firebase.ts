@@ -1,15 +1,46 @@
-import { initializeApp } from 'firebase/app';
+import { initializeApp, getApps, getApp } from 'firebase/app';
 import { getAuth } from 'firebase/auth';
-import { getFirestore } from 'firebase/firestore';
+import { getFirestore, getDocFromServer, doc } from 'firebase/firestore';
 import { getStorage } from 'firebase/storage';
 import { getDatabase } from 'firebase/database';
 
-// Import the Firebase configuration
-import firebaseConfig from '../firebase-applet-config.json';
+// Import the Firebase configuration from the auto-generated file
+import firebaseAppletConfig from '../firebase-applet-config.json';
+
+// Firebase configuration - prioritize environment variables if they exist, 
+// otherwise fallback to the applet config file.
+const firebaseConfig = {
+  apiKey: import.meta.env.VITE_FIREBASE_API_KEY || firebaseAppletConfig.apiKey,
+  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN || firebaseAppletConfig.authDomain,
+  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID || firebaseAppletConfig.projectId,
+  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET || firebaseAppletConfig.storageBucket,
+  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID || firebaseAppletConfig.messagingSenderId,
+  appId: import.meta.env.VITE_FIREBASE_APP_ID || firebaseAppletConfig.appId,
+  measurementId: import.meta.env.VITE_FIREBASE_MEASUREMENT_ID || firebaseAppletConfig.measurementId
+};
+
+const databaseId = import.meta.env.VITE_FIREBASE_DATABASE_ID || firebaseAppletConfig.firestoreDatabaseId;
 
 // Initialize Firebase SDK
-const app = initializeApp(firebaseConfig);
-export const db = getFirestore(app, firebaseConfig.firestoreDatabaseId);
+const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApp();
+export const db = getFirestore(app, databaseId);
 export const auth = getAuth(app);
 export const storage = getStorage(app);
 export const rtdb = getDatabase(app);
+
+// Test connection to Firestore
+async function testConnection() {
+  try {
+    // Attempt to fetch a non-existent document from the server to test connectivity
+    await getDocFromServer(doc(db, '_internal_', 'connection_test'));
+    console.log("Firestore connection verified.");
+  } catch (error: any) {
+    if (error.message && error.message.includes('the client is offline')) {
+      console.error("CRITICAL: Firestore connection failed. This usually means the Project ID or Database ID is incorrect.");
+      console.error("Current Project ID:", firebaseConfig.projectId);
+      console.error("Current Database ID:", databaseId);
+    }
+  }
+}
+
+testConnection();

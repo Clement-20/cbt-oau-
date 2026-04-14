@@ -9,7 +9,6 @@ import HostTestModal from "../components/HostTestModal";
 import TestMetricsModal from "../components/TestMetricsModal";
 import Calculator from "../components/Calculator";
 import AITutor from "../nexus-features/AITutor";
-import { useAcademicStore } from "../lib/academicStore";
 import { Helmet } from "react-helmet-async";
 import { toast } from "../components/Toast";
 import { Calculator as CalcIcon, HelpCircle } from "lucide-react";
@@ -59,7 +58,6 @@ export default function CBT({ user, isFocusMode, setIsFocusMode }: { user: any, 
   const [reviewIndex, setReviewIndex] = useState<number | null>(null);
   const [timePerQuestion, setTimePerQuestion] = useState<number[]>([]);
   const [lastQuestionTime, setLastQuestionTime] = useState<number>(0);
-  const [questionTimeRecorded, setQuestionTimeRecorded] = useState<boolean[]>([]);
 
   // Persistence Logic
   useEffect(() => {
@@ -74,12 +72,12 @@ export default function CBT({ user, isFocusMode, setIsFocusMode }: { user: any, 
         timePerQuestion,
         lastQuestionTime,
         currentHostedTestId,
-      currentHostId,
-      questionTimeRecorded
-    };
-    localStorage.setItem("nexus_cbt_session", JSON.stringify(session));
-  }
-}, [selectedCourse, currentQuestionIndex, userAnswers, timeLeft, isFinished, questionTimeRecorded]);
+        currentHostId
+      };
+      localStorage.setItem("nexus_cbt_session", JSON.stringify(session));
+    }
+  }, [selectedCourse, currentQuestionIndex, userAnswers, timeLeft, isFinished]);
+
   useEffect(() => {
     const savedSession = localStorage.getItem("nexus_cbt_session");
     if (savedSession && !selectedCourse) {
@@ -91,7 +89,6 @@ export default function CBT({ user, isFocusMode, setIsFocusMode }: { user: any, 
       setStartTime(session.startTime);
       setTimeLeft(session.timeLeft);
       setTimePerQuestion(session.timePerQuestion || []);
-      setQuestionTimeRecorded(session.questionTimeRecorded || new Array(session.questions?.length || 0).fill(false));
       setLastQuestionTime(session.lastQuestionTime || Date.now());
       setCurrentHostedTestId(session.currentHostedTestId);
       setCurrentHostId(session.currentHostId);
@@ -112,29 +109,6 @@ export default function CBT({ user, isFocusMode, setIsFocusMode }: { user: any, 
     const shuffledOptions = shuffle(q.options);
     const newCorrectAnswer = shuffledOptions.indexOf(originalCorrectOption);
     return { ...q, options: shuffledOptions, correctAnswer: newCorrectAnswer };
-  };
-
-  const finalizeQuestionTime = (questionIndex: number) => {
-    if (questionTimeRecorded[questionIndex]) return;
-
-    const now = Date.now();
-    const elapsed = Math.floor((now - lastQuestionTime) / 1000);
-
-    if (elapsed > 0) {
-      setTimePerQuestion((prev) => {
-        const times = [...prev];
-        times[questionIndex] = (times[questionIndex] || 0) + elapsed;
-        return times;
-      });
-    }
-
-    setQuestionTimeRecorded((prev) => {
-      const newState = [...prev];
-      newState[questionIndex] = true;
-      return newState;
-    });
-
-    setLastQuestionTime(now);
   };
 
   useEffect(() => {
@@ -256,11 +230,7 @@ export default function CBT({ user, isFocusMode, setIsFocusMode }: { user: any, 
   }, [timeLeft, isFinished, userAnswers, questions]); // Include dependencies to ensure fresh state
 
 
-  const resetAIUsage = useAcademicStore((state) => state.resetAIUsage);
   const startTest = async (courseCode: string, hostedTest?: HostedTest) => {
-    // Reset per-test free explanation counter
-    resetAIUsage();
-
     if (hostedTest) {
       if (hostedTest.maxAttempts) {
         try {
@@ -314,14 +284,17 @@ export default function CBT({ user, isFocusMode, setIsFocusMode }: { user: any, 
     setNewlyAwardedShana(false);
     setUserAnswers(new Array(hostedTest ? hostedTest.questions.length : questionLimit).fill(null));
     setTimePerQuestion(new Array(hostedTest ? hostedTest.questions.length : questionLimit).fill(0));
-    setQuestionTimeRecorded(new Array(hostedTest ? hostedTest.questions.length : questionLimit).fill(false));
     setReviewIndex(null);
   };
 
   const handleAnswer = (optionIndex: number) => {
-    if (!questionTimeRecorded[currentQuestionIndex]) {
-      finalizeQuestionTime(currentQuestionIndex);
-    }
+    const now = Date.now();
+    const timeSpentOnThisQ = Math.floor((now - lastQuestionTime) / 1000);
+    
+    const newTimePerQ = [...timePerQuestion];
+    newTimePerQ[currentQuestionIndex] = (newTimePerQ[currentQuestionIndex] || 0) + timeSpentOnThisQ;
+    setTimePerQuestion(newTimePerQ);
+    setLastQuestionTime(now);
 
     const newAnswers = [...userAnswers];
     newAnswers[currentQuestionIndex] = optionIndex;
@@ -330,29 +303,31 @@ export default function CBT({ user, isFocusMode, setIsFocusMode }: { user: any, 
   };
 
   const nextQuestion = () => {
-    if (!questionTimeRecorded[currentQuestionIndex]) {
-      finalizeQuestionTime(currentQuestionIndex);
-    }
-
+    const now = Date.now();
+    const timeSpentOnThisQ = Math.floor((now - lastQuestionTime) / 1000);
+    const newTimePerQ = [...timePerQuestion];
+    newTimePerQ[currentQuestionIndex] = (newTimePerQ[currentQuestionIndex] || 0) + timeSpentOnThisQ;
+    setTimePerQuestion(newTimePerQ);
+    setLastQuestionTime(now);
     setCurrentQuestionIndex(currentQuestionIndex + 1);
-    setSelectedOption(userAnswers[currentQuestionIndex + 1]);
-    setLastQuestionTime(Date.now());
   };
 
   const prevQuestion = () => {
-    if (!questionTimeRecorded[currentQuestionIndex]) {
-      finalizeQuestionTime(currentQuestionIndex);
-    }
-
+    const now = Date.now();
+    const timeSpentOnThisQ = Math.floor((now - lastQuestionTime) / 1000);
+    const newTimePerQ = [...timePerQuestion];
+    newTimePerQ[currentQuestionIndex] = (newTimePerQ[currentQuestionIndex] || 0) + timeSpentOnThisQ;
+    setTimePerQuestion(newTimePerQ);
+    setLastQuestionTime(now);
     setCurrentQuestionIndex(currentQuestionIndex - 1);
-    setSelectedOption(userAnswers[currentQuestionIndex - 1]);
-    setLastQuestionTime(Date.now());
   };
 
   const submitTest = async () => {
-    if (!questionTimeRecorded[currentQuestionIndex]) {
-      finalizeQuestionTime(currentQuestionIndex);
-    }
+    const now = Date.now();
+    const timeSpentOnThisQ = Math.floor((now - lastQuestionTime) / 1000);
+    const newTimePerQ = [...timePerQuestion];
+    newTimePerQ[currentQuestionIndex] = (newTimePerQ[currentQuestionIndex] || 0) + timeSpentOnThisQ;
+    setTimePerQuestion(newTimePerQ);
 
     let finalScore = 0;
     questions.forEach((q, idx) => {
@@ -590,7 +565,7 @@ export default function CBT({ user, isFocusMode, setIsFocusMode }: { user: any, 
                 <AITutor 
                   question={questions[reviewIndex].question}
                   options={questions[reviewIndex].options}
-                  correctAnswerIndex={questions[reviewIndex].correctAnswer}
+                  correctAnswer={questions[reviewIndex].options[questions[reviewIndex].correctAnswer]}
                   isVerified={isVerified}
                   isVisible={true}
                 />
@@ -657,7 +632,7 @@ export default function CBT({ user, isFocusMode, setIsFocusMode }: { user: any, 
         <AITutor 
           question={q.question}
           options={q.options}
-          correctAnswerIndex={q.correctAnswer}
+          correctAnswer={q.options[q.correctAnswer]}
           isVerified={isVerified}
           isVisible={userAnswers[currentQuestionIndex] !== null}
         />

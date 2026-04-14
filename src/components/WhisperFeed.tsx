@@ -13,42 +13,6 @@ export default function WhisperFeed({ user }: { user: any }) {
   const [postCount, setPostCount] = useState(0);
   const [isPosting, setIsPosting] = useState(false);
 
-  const DAILY_LIMIT = 5;
-  const RESET_INTERVAL_MS = 24 * 60 * 60 * 1000; // 24 hours
-
-  const getWhisperCount = () => {
-    if (!user) return 0;
-    const key = `whisper_count_${user.uid}`;
-    const data = localStorage.getItem(key);
-    
-    if (!data) return 0;
-    
-    const { count, timestamp } = JSON.parse(data);
-    const now = Date.now();
-    
-    // If 24 hours have passed, reset
-    if (now - timestamp > RESET_INTERVAL_MS) {
-      localStorage.removeItem(key);
-      return 0;
-    }
-    
-    return count;
-  };
-
-  const incrementWhisperCount = () => {
-    if (!user) return;
-    const key = `whisper_count_${user.uid}`;
-    const newCount = getWhisperCount() + 1;
-    localStorage.setItem(key, JSON.stringify({ count: newCount, timestamp: Date.now() }));
-    setPostCount(newCount);
-  };
-
-  useEffect(() => {
-    if (user) {
-      setPostCount(getWhisperCount());
-    }
-  }, [user]);
-
   useEffect(() => {
     const q = query(collection(db, 'whispers'), orderBy('timestamp', 'desc'), limit(50));
     const unsubscribe = onSnapshot(q, (snapshot) => {
@@ -70,7 +34,7 @@ export default function WhisperFeed({ user }: { user: any }) {
       toast("Please sign in to whisper.");
       return;
     }
-    if (postCount >= DAILY_LIMIT) {
+    if (postCount >= 5) {
       toast("Daily whisper limit reached! 🤫");
       return;
     }
@@ -90,7 +54,7 @@ export default function WhisperFeed({ user }: { user: any }) {
         authorUid: user.uid
       });
       setNewWhisper('');
-      incrementWhisperCount();
+      setPostCount(prev => prev + 1);
       toast("Whisper sent! 🌬️");
     } catch (error) {
       console.error("Error posting whisper:", error);
@@ -106,7 +70,7 @@ export default function WhisperFeed({ user }: { user: any }) {
       <div className="flex items-center justify-between">
         <h2 className="text-xl font-bold">Nexus Whisper</h2>
         <span className="text-[10px] uppercase font-bold text-[var(--foreground)]/40 tracking-widest">
-          {DAILY_LIMIT - postCount} whispers left today
+          {5 - postCount} whispers left today
         </span>
       </div>
       <div className="h-64 overflow-y-auto space-y-2 pr-2 custom-scrollbar">

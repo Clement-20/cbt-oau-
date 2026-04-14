@@ -308,7 +308,7 @@ export default function Profile({ user }: { user: any }) {
         <h2 className="text-2xl font-black tracking-tighter">Nexus Support</h2>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <a 
-            href="https://x.com/clementife12500" 
+            href="https://x.com/clementifeoluwa" 
             target="_blank" 
             rel="noopener noreferrer"
             className="flex items-center justify-between p-5 bg-black/5 dark:bg-white/5 border border-[var(--border)] rounded-3xl hover:bg-blue-500/5 hover:border-blue-500/30 transition-all group"
@@ -326,8 +326,8 @@ export default function Profile({ user }: { user: any }) {
           </a>
 
           <a 
-            href="https://ng.linkedin.com/in/ifeoluwa-banmeke-2286a0271" 
-            target="_blank"
+            href="https://linkedin.com/in/clementifeoluwa" 
+            target="_blank" 
             rel="noopener noreferrer"
             className="flex items-center justify-between p-5 bg-black/5 dark:bg-white/5 border border-[var(--border)] rounded-3xl hover:bg-blue-700/5 hover:border-blue-700/30 transition-all group"
           >

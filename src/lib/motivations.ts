@@ -8,7 +8,7 @@ export const clementQuotes = [
   "You are the architect of your own academic destiny.",
   "Code your future, one line at a time.",
   "Excellence is not an act, but a habit.",
-  "Stay Cold, stay focused. ❄️🧊"
+  "Stay frosty, stay focused. ❄️🧊"
 ];
 
 export const aiTips = [
