@@ -76,7 +76,7 @@ export default function Community({ user }: { user: any }) {
         <title>Community Hub | Digital Nexus - OAU Student Network</title>
         <meta name="description" content="Connect with OAU students in the Community Hub. Share reviews, post whispers, and shop at the Flex Store." />
         <meta name="keywords" content="OAU community, OAU student reviews, OAU whisper feed, OAU flex store, OAU marketplace, Obafemi Awolowo University" />
-        <link rel="canonical" href={`${import.meta.env.NEXT_PUBLIC_BASE_URL || 'https://icepab-nexus.run.app'}/community`} />
+        <link rel="canonical" href={`${import.meta.env.NEXT_PUBLIC_BASE_URL || 'https://oau.cbt.icepab.name.ng'}/community`} />
       </Helmet>
 
       <div className="text-center space-y-4">
