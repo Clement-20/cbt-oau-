@@ -10,7 +10,7 @@ import rateLimit from "express-rate-limit";
 async function startServer() {
   const app = express();
   const PORT = 3000;
-  const BASE_URL = process.env.NEXT_PUBLIC_BASE_URL || "https://icepab-nexus.run.app";
+  const BASE_URL = process.env.NEXT_PUBLIC_BASE_URL || "https://oau.cbt.icepab.name.ng";
 
   app.use(compression());
   app.use(express.json());
