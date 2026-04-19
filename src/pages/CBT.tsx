@@ -737,7 +737,7 @@ export default function CBT({ user, isFocusMode, setIsFocusMode }: { user: any, 
       <Helmet>
         <title>CBT Engine | Digital Nexus</title>
         <meta name="description" content="Practice exams for GST 111, BUS 101, SOC 101, and AMS 103 on the Digital Nexus CBT Engine." />
-        <link rel="canonical" href={`${import.meta.env.NEXT_PUBLIC_BASE_URL || 'https://icepab-nexus.run.app'}/cbt`} />
+        <link rel="canonical" href={`${import.meta.env.NEXT_PUBLIC_BASE_URL || 'https://oau.cbt.icepab.name.ng'}/cbt`} />
         <script type="application/ld+json">
           {`
             {
