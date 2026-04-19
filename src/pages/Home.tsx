@@ -103,7 +103,7 @@ export default function Home({ user, login, isLoggingIn }: { user: any, login?: 
         <title>Home | Digital Nexus - OAU Student Super-App</title>
         <meta name="description" content="Welcome to Digital Nexus, the ultimate OAU student super-app. Practice OAU CBT GST 111, use the OAU CGPA Calculator, and access OAU student resources." />
         <meta name="keywords" content="OAU CBT GST 111, OAU CGPA Calculator, OAU Freshers Guide, Obafemi Awolowo University, ICEPAB, OAU student portal, OAU E-Portal, Great Ife, OAU Nexus" />
-        <link rel="canonical" href={`${import.meta.env.NEXT_PUBLIC_BASE_URL || 'https://icepab-nexus.run.app'}/`} />
+        <link rel="canonical" href={`${import.meta.env.NEXT_PUBLIC_BASE_URL || 'https://oau.cbt.icepab.name.ng'}/`} />
         <script type="application/ld+json">
           {`
             {
@@ -114,7 +114,7 @@ export default function Home({ user, login, isLoggingIn }: { user: any, login?: 
               "description": "The ultimate OAU student super-app. Practice OAU CBT GST 111, use the OAU CGPA Calculator, and read the OAU Freshers Guide.",
               "potentialAction": {
                 "@type": "SearchAction",
-                "target": "${import.meta.env.NEXT_PUBLIC_BASE_URL || 'https://icepab-nexus.run.app'}/cbt?q={search_term_string}",
+                "target": "${import.meta.env.NEXT_PUBLIC_BASE_URL || 'https://oau.cbt.icepab.name.ng'}/cbt?q={search_term_string}",
                 "query-input": "required name=search_term_string"
               }
             }
