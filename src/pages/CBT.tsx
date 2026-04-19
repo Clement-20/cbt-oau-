@@ -753,7 +753,7 @@ export default function CBT({ user, isFocusMode, setIsFocusMode }: { user: any, 
                   "provider": {
                     "@type": "Organization",
                     "name": "Digital Nexus",
-                    "sameAs": "${import.meta.env.NEXT_PUBLIC_BASE_URL || 'https://icepab-nexus.run.app'}"
+                    "sameAs": "${import.meta.env.NEXT_PUBLIC_BASE_URL || 'https://oau.cbt.icepab.name.ng'}"
                   },
                   "courseCode": course.code
                 }
