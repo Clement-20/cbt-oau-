@@ -110,7 +110,7 @@ export default function Home({ user, login, isLoggingIn }: { user: any, login?: 
               "@context": "https://schema.org",
               "@type": "WebSite",
               "name": "Digital Nexus",
-              "url": "${import.meta.env.NEXT_PUBLIC_BASE_URL || 'https://icepab-nexus.run.app'}",
+              "url": "${import.meta.env.NEXT_PUBLIC_BASE_URL || 'https://oau.cbt.icepab.name.ng'}",
               "description": "The ultimate OAU student super-app. Practice OAU CBT GST 111, use the OAU CGPA Calculator, and read the OAU Freshers Guide.",
               "potentialAction": {
                 "@type": "SearchAction",
