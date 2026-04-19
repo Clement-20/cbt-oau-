@@ -321,7 +321,7 @@ function MainApp() {
         <meta property="og:title" content="Digital Nexus | OAU Digital Hub by Clement IfeOluwa" />
         <meta property="og:description" content="The ultimate OAU student super-app. Practice OAU CBT GST 111, use the OAU CGPA Calculator, and read the OAU Freshers Guide." />
         <meta property="og:type" content="website" />
-        <meta property="og:url" content={`${import.meta.env.NEXT_PUBLIC_BASE_URL || 'https://icepab-nexus.run.app'}${location.pathname}`} />
+        <meta property="og:url" content={`${import.meta.env.NEXT_PUBLIC_BASE_URL || 'https://oau.cbt.icepab.name.ng'}${location.pathname}`} />
         <meta property="og:image" content={`${import.meta.env.NEXT_PUBLIC_BASE_URL || 'https://icepab-nexus.run.app'}/og-image.png`} />
         <link rel="canonical" href={`${import.meta.env.NEXT_PUBLIC_BASE_URL || 'https://icepab-nexus.run.app'}${location.pathname}${location.search}`} />
         <meta name="twitter:card" content="summary_large_image" />
