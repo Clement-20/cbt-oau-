@@ -56,7 +56,8 @@ export default function Home({ user, login, isLoggingIn }: { user: any, login?: 
     };
 
     checkPortal();
-    const interval = setInterval(checkPortal, 5000);
+    // Optimized for 35k users: Poll every 2 minutes instead of 5 seconds
+    const interval = setInterval(checkPortal, 120000);
     return () => clearInterval(interval);
   }, []);
 

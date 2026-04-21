@@ -1,6 +1,6 @@
 import { initializeApp, getApps, getApp } from 'firebase/app';
 import { getAuth } from 'firebase/auth';
-import { getFirestore, getDocFromServer, doc } from 'firebase/firestore';
+import { getFirestore, getDocFromServer, doc, enableIndexedDbPersistence } from 'firebase/firestore';
 import { getStorage } from 'firebase/storage';
 import { getDatabase } from 'firebase/database';
 
@@ -24,6 +24,18 @@ const databaseId = import.meta.env.VITE_FIREBASE_DATABASE_ID || firebaseAppletCo
 // Initialize Firebase SDK
 const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApp();
 export const db = getFirestore(app, databaseId);
+
+// Enable Offline Persistence for 35k+ multi-user scalability and bandwidth efficiency
+if (typeof window !== "undefined") {
+  enableIndexedDbPersistence(db).catch((err) => {
+    if (err.code === 'failed-precondition') {
+      console.warn("Firestore Persistence: Multiple tabs open. Persistence disabled for this tab.");
+    } else if (err.code === 'unimplemented') {
+      console.warn("Firestore Persistence: Browser doesn't support persistence.");
+    }
+  });
+}
+
 export const auth = getAuth(app);
 export const storage = getStorage(app);
 export const rtdb = getDatabase(app);

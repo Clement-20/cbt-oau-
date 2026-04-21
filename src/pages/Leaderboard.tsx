@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { collection, query, orderBy, limit, onSnapshot } from "firebase/firestore";
+import { collection, query, orderBy, limit, getDocs } from "firebase/firestore";
 import { handleFirestoreError, OperationType } from "../utils/errorHandling";
 import { db } from "../firebase";
 import { Trophy, Medal, Award, Flame, Share2 } from "lucide-react";
@@ -38,17 +38,20 @@ export default function Leaderboard({ user }: { user: any }) {
 
   useEffect(() => {
     if (!user) return;
-    const q = query(collection(db, "users"), orderBy("xp", "desc"), limit(20));
-    const unsub = onSnapshot(q, (snapshot) => {
-      const users: any[] = [];
-      snapshot.forEach((doc) => {
-        users.push({ id: doc.id, ...doc.data() });
-      });
-      setLeaders(users);
-    }, (error) => {
-      handleFirestoreError(error, OperationType.GET, "users");
-    });
-    return () => unsub();
+    const fetchLeaders = async () => {
+      try {
+        const q = query(collection(db, "users"), orderBy("xp", "desc"), limit(20));
+        const snapshot = await getDocs(q);
+        const users: any[] = [];
+        snapshot.forEach((doc) => {
+          users.push({ id: doc.id, ...doc.data() });
+        });
+        setLeaders(users);
+      } catch (error) {
+        handleFirestoreError(error, OperationType.GET, "users");
+      }
+    };
+    fetchLeaders();
   }, [user]);
 
   if (!user) {

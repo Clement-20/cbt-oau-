@@ -85,8 +85,22 @@ async function startServer() {
     }
   });
 
-  // API Route: Portal Check (Real Heartbeat)
+  // In-memory cache for Portal Check to save OAU bandwidth and Vercel execution hours
+  let portalCache: { data: any, lastUpdate: number } = { data: null, lastUpdate: 0 };
+
+  // API Route: Portal Check (Real Heartbeat with 5-minute caching)
   app.get("/api/portal-check", async (req, res) => {
+    const now = Date.now();
+    const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
+
+    if (portalCache.data && (now - portalCache.lastUpdate < CACHE_DURATION)) {
+      return res.json({
+        ...portalCache.data,
+        cached: true,
+        ttl: Math.round((CACHE_DURATION - (now - portalCache.lastUpdate)) / 1000)
+      });
+    }
+
     try {
       const startTime = Date.now();
       // Ping OAU ePortal
@@ -96,26 +110,24 @@ async function startServer() {
       });
       const duration = Date.now() - startTime;
 
-      let status = "ONLINE";
-      let message = "Portal is stable. Proceed with registration.";
-
-      if (duration > 4000) {
-        status = "SLOW";
-        message = "Portal is responding slowly. High traffic detected.";
-      }
-
-      res.json({
-        status,
+      const fetchedData = {
+        status: duration > 4000 ? "SLOW" : "ONLINE",
         timestamp: new Date().toISOString(),
         latency: `${duration}ms`,
-        message
-      });
+        message: duration > 4000 ? "Portal is responding slowly. High traffic detected." : "Portal is stable. Proceed with registration."
+      };
+
+      portalCache = { data: fetchedData, lastUpdate: now };
+      res.json(fetchedData);
     } catch (error: any) {
-      res.json({
+      const errorData = {
         status: "OFFLINE",
         timestamp: new Date().toISOString(),
         message: "Portal is currently unreachable. Might be down or under maintenance."
-      });
+      };
+      // Don't cache errors for too long, retry after 1 minute
+      portalCache = { data: errorData, lastUpdate: now - (4 * 60 * 1000) };
+      res.json(errorData);
     }
   });
 
