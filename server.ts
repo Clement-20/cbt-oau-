@@ -20,7 +20,7 @@ async function startServer() {
   // Necessary for rate-limiting and session cookies behind Cloud Run's proxy
   app.set("trust proxy", 1);
 
-  const BASE_URL = process.env.NEXT_PUBLIC_BASE_URL || "https://icepab-nexus.run.app";
+  const BASE_URL = process.env.VITE_BASE_URL || "https://oau.cbt.icepab.name.ng";
 
   app.use(compression());
   app.use(express.json());

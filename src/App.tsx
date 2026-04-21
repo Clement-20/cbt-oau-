@@ -112,6 +112,9 @@ function MainApp() {
     });
 
     const unsubscribeAuth = onAuthStateChanged(auth, async (currentUser) => {
+      // Keep loading true while we resolve the database profile
+      setLoading(true);
+      
       try {
         setUser(currentUser);
         if (currentUser) {
@@ -162,6 +165,15 @@ function MainApp() {
             }
           } else {
             let userData = userSnap.data();
+            
+            // CRITICAL: Immediate termination if banned
+            if (userData.isBanned) {
+              setDbUser(userData);
+              setUser(currentUser);
+              setLoading(false);
+              return;
+            }
+
             if (!currentUser.isAnonymous && !userData.matricNumber && location.pathname !== "/setup") {
               navigate("/setup");
             }
@@ -175,7 +187,6 @@ function MainApp() {
             }
             
             if (now - shanaPeriodStart > 14 * 24 * 60 * 60 * 1000) {
-              // Reset Shana stats every 2 weeks
               userData = {
                 ...userData,
                 isShana: false,
@@ -189,14 +200,11 @@ function MainApp() {
                 highScoreCount: 0,
                 shanaPeriodStart: now
               });
-            } else if (!userData.shanaPeriodStart) {
-              userData.shanaPeriodStart = now;
-              await updateDoc(userRef, { shanaPeriodStart: now });
             }
             
             setDbUser(userData);
             
-            // Update streak
+            // Update streak asynchronously without blocking the UI
             updateNexusStreak(currentUser.uid).then(newStreak => {
               setDbUser((prev: any) => prev ? { ...prev, currentStreak: newStreak } : prev);
             });
@@ -328,9 +336,9 @@ function MainApp() {
         <meta property="og:title" content="Digital Nexus | OAU CBT Hub & ePortal Access" />
         <meta property="og:description" content="The ultimate OAU student super-app. Practice OAU CBT for all courses, access OAU ePortal, and download study PDFs." />
         <meta property="og:type" content="website" />
-        <meta property="og:url" content={`${import.meta.env.NEXT_PUBLIC_BASE_URL || 'https://oau.cbt.icepab.name.ng'}${location.pathname}`} />
-        <meta property="og:image" content={`${import.meta.env.NEXT_PUBLIC_BASE_URL || 'https://oau.cbt.icepab.name.ng'}/og-image.png`} />
-        <link rel="canonical" href={`${import.meta.env.NEXT_PUBLIC_BASE_URL || 'https://oau.cbt.icepab.name.ng'}${location.pathname}${location.search}`} />
+        <meta property="og:url" content={`${import.meta.env.VITE_BASE_URL || 'https://oau.cbt.icepab.name.ng'}${location.pathname}`} />
+        <meta property="og:image" content={`${import.meta.env.VITE_BASE_URL || 'https://oau.cbt.icepab.name.ng'}/og-image.png`} />
+        <link rel="canonical" href={`${import.meta.env.VITE_BASE_URL || 'https://oau.cbt.icepab.name.ng'}${location.pathname}${location.search}`} />
         <meta name="twitter:card" content="summary_large_image" />
         <meta name="twitter:title" content="Digital Nexus | OAU Digital Hub & CBT Engine" />
         <meta name="twitter:description" content="Practice OAU CBT, access ePortal, and dominate your exams with Digital Nexus." />

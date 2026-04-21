@@ -1,15 +1,13 @@
 import React, { useState, useEffect } from "react";
 import { Helmet } from "react-helmet-async";
-import { collection, addDoc, serverTimestamp } from "firebase/firestore";
-import { db } from "../firebase";
+import { usePaystackPayment } from "react-paystack";
 import { toast } from "../components/Toast";
-import { Loader2, CreditCard, Copy, Check, ShieldAlert } from "lucide-react";
+import { Loader2, CreditCard, ShieldCheck } from "lucide-react";
 import { getSettings } from "../lib/settings";
+import { PaymentService } from "../services/PaymentService";
 
 export default function Verification({ user }: { user: any }) {
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [reference, setReference] = useState("");
-  const [copied, setCopied] = useState(false);
   const [isPaymentEnabled, setIsPaymentEnabled] = useState(true);
   const [loading, setLoading] = useState(true);
 
@@ -20,42 +18,23 @@ export default function Verification({ user }: { user: any }) {
     }).catch(() => setLoading(false));
   }, []);
 
-  const copyAccountNumber = () => {
-    navigator.clipboard.writeText("9127813092");
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
-  };
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!user) return;
-    if (!isPaymentEnabled) {
-      toast("Payment verification is currently disabled.");
-      return;
-    }
-    if (!reference.trim()) {
-      toast("Please enter your payment reference");
-      return;
-    }
-
-    setIsSubmitting(true);
-    try {
-      await addDoc(collection(db, "payment_verifications"), {
-        userId: user.uid,
-        userEmail: user.email,
-        userName: user.displayName,
-        reference,
-        status: "pending",
-        timestamp: serverTimestamp()
-      });
-      toast("Verification request submitted! Admin will verify shortly.");
-      setReference("");
-    } catch (error) {
-      toast("Failed to submit request.");
-    } finally {
+  const config = PaymentService.getPaystackConfig(
+    user?.email || "",
+    500, // ₦500 verification fee
+    async (reference: any) => {
+      setIsSubmitting(true);
+      const success = await PaymentService.verifyStudent(user.uid);
+      if (success) {
+        // Success handled in PaymentService toast
+      }
       setIsSubmitting(false);
+    },
+    () => {
+      toast("Transaction cancelled.");
     }
-  };
+  );
+
+  const initializePayment = usePaystackPayment(config);
 
   if (loading) {
     return (
@@ -65,53 +44,43 @@ export default function Verification({ user }: { user: any }) {
     );
   }
 
-  if (!isPaymentEnabled) {
-    return (
-      <div className="max-w-md mx-auto py-12 px-4 text-center">
-        <div className="glass-panel p-8 rounded-3xl space-y-4">
-          <ShieldAlert className="text-amber-500 mx-auto" size={48} />
-          <h1 className="text-2xl font-bold">Verification Disabled</h1>
-          <p className="text-[var(--foreground)]/60">
-            Payment verification is currently disabled by the admin. Please check back later or contact support.
-          </p>
-        </div>
-      </div>
-    );
-  }
-
   return (
     <div className="max-w-md mx-auto py-12 px-4">
       <Helmet>
-        <title>Verify Student | Digital Nexus</title>
+        <title>Student Verification | Digital Nexus</title>
       </Helmet>
-      <div className="glass-panel p-8 rounded-3xl space-y-6">
-        <h1 className="text-2xl font-bold flex items-center gap-2">
-          <CreditCard className="text-blue-500" /> Verify Student
-        </h1>
+      <div className="glass-panel p-8 rounded-3xl space-y-6 text-center">
+        <div className="w-16 h-16 bg-blue-500/10 rounded-full flex items-center justify-center mx-auto">
+          <CreditCard className="text-blue-500" size={32} />
+        </div>
+        <h1 className="text-3xl font-black tracking-tight">Verified Status</h1>
         <p className="text-[var(--foreground)]/60">
-          Pay N1,000 to Opay 
-          <span className="font-mono font-bold bg-black/10 dark:bg-white/10 px-2 py-1 rounded cursor-pointer flex items-center gap-2 inline-flex" onClick={copyAccountNumber}>
-            9127813092 {copied ? <Check size={14} className="text-emerald-500" /> : <Copy size={14} />}
-          </span>
-          and enter your payment reference below to get verified.
+          Get the <span className="text-blue-500 font-bold">Verified Student</span> badge, unlimited CBT attempts, and early access to study materials for a lifetime fee of <span className="font-bold">₦500</span>.
         </p>
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <input
-            type="text"
-            value={reference}
-            onChange={(e) => setReference(e.target.value)}
-            placeholder="Payment Reference / Transaction ID"
-            className="w-full bg-black/5 dark:bg-black/50 border border-[var(--border)] rounded-xl p-3 text-[var(--foreground)]"
-            required
-          />
+        
+        <div className="space-y-4 pt-4">
           <button
-            type="submit"
-            disabled={isSubmitting}
-            className="w-full bg-blue-600 hover:bg-blue-700 text-white py-3 rounded-xl font-bold transition-colors flex items-center justify-center gap-2"
+            onClick={() => {
+              // @ts-ignore - initializePayment type can be tricky with different package versions
+              initializePayment();
+            }}
+            disabled={isSubmitting || !isPaymentEnabled}
+            className="w-full bg-blue-600 hover:bg-blue-700 text-white py-4 rounded-2xl font-bold transition-all shadow-lg shadow-blue-500/20 flex items-center justify-center gap-2 group"
           >
-            {isSubmitting ? <Loader2 className="animate-spin" size={20} /> : "Submit Verification"}
+            {isSubmitting ? (
+              <Loader2 className="animate-spin" size={20} />
+            ) : (
+              <>
+                <ShieldCheck size={20} className="group-hover:scale-110 transition-transform" />
+                Pay ₦500 & Verify Now
+              </>
+            )}
           </button>
-        </form>
+          
+          <p className="text-[10px] uppercase font-bold tracking-widest text-[var(--foreground)]/40">
+            Secure Payment via Paystack
+          </p>
+        </div>
       </div>
     </div>
   );

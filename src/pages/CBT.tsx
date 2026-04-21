@@ -738,7 +738,7 @@ export default function CBT({ user, isFocusMode, setIsFocusMode }: { user: any, 
         <title>OAU CBT Engine | Practice Past Questions for All Courses | Digital Nexus</title>
         <meta name="description" content="Practice OAU CBT past questions for ALL courses including GSTs, Special Electives, and Departmental courses. Simulate Great Ife exams with timed tests and AI-powered verifications." />
         <meta name="keywords" content="OAU CBT practice, OAU past questions, Great Ife CBT, ICEPAB, OAU GST courses, OAU departmental questions, OAU student portal" />
-        <link rel="canonical" href={`${import.meta.env.NEXT_PUBLIC_BASE_URL || 'https://oau.cbt.icepab.name.ng'}/cbt`} />
+        <link rel="canonical" href={`${import.meta.env.VITE_BASE_URL || 'https://oau.cbt.icepab.name.ng'}/cbt`} />
         <script type="application/ld+json">
           {`
             {
@@ -754,7 +754,7 @@ export default function CBT({ user, isFocusMode, setIsFocusMode }: { user: any, 
                   "provider": {
                     "@type": "Organization",
                     "name": "ICEPAB Digital Nexus",
-                    "sameAs": "${import.meta.env.NEXT_PUBLIC_BASE_URL || 'https://oau.cbt.icepab.name.ng'}"
+                    "sameAs": "${import.meta.env.VITE_BASE_URL || 'https://oau.cbt.icepab.name.ng'}"
                   },
                   "courseCode": course.code
                 }

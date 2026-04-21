@@ -104,18 +104,18 @@ export default function Home({ user, login, isLoggingIn }: { user: any, login?: 
         <title>Home | Digital Nexus - OAU Student Portal & CBT Hub</title>
         <meta name="description" content="Access OAU ePortal, practice OAU CBT questions for ALL courses (GST, Special Electives, etc.), and download OAU study PDFs. Digital Nexus by ICEPAB is the #1 hub for OAU academic excellence." />
         <meta name="keywords" content="OAU ePortal login, OAU student portal, OAU CBT past questions, All OAU Courses, OAU Post UTME questions, OAU CGPA Calculator, ICEPAB, Digital Nexus, Great Ife, OAU academic calendar" />
-        <link rel="canonical" href={`${import.meta.env.NEXT_PUBLIC_BASE_URL || 'https://oau.cbt.icepab.name.ng'}/`} />
+        <link rel="canonical" href={`${import.meta.env.VITE_BASE_URL || 'https://oau.cbt.icepab.name.ng'}/`} />
         <script type="application/ld+json">
           {`
             {
               "@context": "https://schema.org",
               "@type": "WebSite",
               "name": "Digital Nexus",
-              "url": "${import.meta.env.NEXT_PUBLIC_BASE_URL || 'https://oau.cbt.icepab.name.ng'}",
+              "url": "${import.meta.env.VITE_BASE_URL || 'https://oau.cbt.icepab.name.ng'}",
               "description": "The ultimate OAU student super-app by ICEPAB. Practice OAU CBT for all courses, access OAU ePortal, and download study PDFs.",
               "potentialAction": {
                 "@type": "SearchAction",
-                "target": "${import.meta.env.NEXT_PUBLIC_BASE_URL || 'https://oau.cbt.icepab.name.ng'}/cbt?q={search_term_string}",
+                "target": "${import.meta.env.VITE_BASE_URL || 'https://oau.cbt.icepab.name.ng'}/cbt?q={search_term_string}",
                 "query-input": "required name=search_term_string"
               }
             }
