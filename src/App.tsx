@@ -330,21 +330,16 @@ function MainApp() {
   return (
     <div className="min-h-screen bg-[var(--background)] text-[var(--foreground)] font-sans transition-colors duration-300">
       <Helmet>
-        <title>Digital Nexus | OAU CBT, ePortal Hub & Study PDFs by Clement IfeOluwa</title>
-        <meta name="description" content="Digital Nexus by ICEPAB: The ultimate OAU student super-app. Practice OAU CBT for ALL courses, GSTs, and Special Electives. Access OAU ePortal, download OAU study PDFs, and prepare for OAU Post UTME." />
-        <meta name="keywords" content="ICEPAB, Digital Nexus, OAU CBT, All OAU Courses, OAU ePortal login, OAU student portal, OAU Post UTME past questions, OAU CGPA Calculator, OAU study PDFs, OAU academic resources, Clement IfeOluwa, Great Ife digital hub" />
-        <meta property="og:title" content="Digital Nexus | OAU CBT Hub & ePortal Access" />
-        <meta property="og:description" content="The ultimate OAU student super-app. Practice OAU CBT for all courses, access OAU ePortal, and download study PDFs." />
-        <meta property="og:type" content="website" />
-        <meta property="og:url" content={`${import.meta.env.VITE_BASE_URL || 'https://oau.cbt.icepab.name.ng'}${location.pathname}`} />
-        <meta property="og:image" content={`${import.meta.env.VITE_BASE_URL || 'https://oau.cbt.icepab.name.ng'}/og-image.png`} />
-        <link rel="canonical" href={`${import.meta.env.VITE_BASE_URL || 'https://oau.cbt.icepab.name.ng'}${location.pathname}${location.search}`} />
-        <meta name="twitter:card" content="summary_large_image" />
-        <meta name="twitter:title" content="Digital Nexus | OAU Digital Hub & CBT Engine" />
-        <meta name="twitter:description" content="Practice OAU CBT, access ePortal, and dominate your exams with Digital Nexus." />
-        <meta name="theme-color" content="#2563eb" />
-        <meta name="robots" content="index, follow" />
-        <meta name="author" content="Clement IfeOluwa" />
+        <title>Digital Nexus | OAU CBT Practice & CGPA Calculator</title>
+        <meta name="keywords" content="OAU CBT, GST 111 OAU, OAU CGPA Calculator, Obafemi Awolowo University, Great Ife, OAU e-portal, Digital Nexus, ICEPAB, Clement IfeOluwa, OAU Past Questions, OAU Post-UTME, OAU Freshers Guide" />
+        
+        {/* Add this for better SEO on the new domain */}
+        <link rel="canonical" href="https://oau.cbt.icepab.name.ng" />
+        
+        {/* OpenGraph for WhatsApp/Twitter previews */}
+        <meta property="og:title" content="Digital Nexus - The Ultimate OAU Student App" />
+        <meta property="og:description" content="Master your OAU CBT exams, calculate your GP, and access campus resources instantly." />
+        <meta property="og:url" content="https://oau.cbt.icepab.name.ng" />
       </Helmet>
       <nav className={clsx(
         "border-b border-[var(--border)] p-4 sticky top-0 bg-[var(--background)]/80 backdrop-blur-xl z-50 shadow-sm transition-transform duration-500",
