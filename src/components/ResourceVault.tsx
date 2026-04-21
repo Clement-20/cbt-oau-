@@ -31,7 +31,7 @@ export default function ResourceMarketplace({ user, isAdmin }: { user?: any, isA
   const [resources, setResources] = useState<Resource[]>([]);
   const [search, setSearch] = useState("");
   const [showUpload, setShowUpload] = useState(false);
-  const [activeTab, setActiveTab] = useState<"feed" | "my-uploads">("feed");
+  const [activeTab, setActiveTab] = useState<"feed" | "my-uploads" | "favorites">("feed");
   const [newResource, setNewResource] = useState<{title: string, type: "PDF" | "Image" | "Link", url: string, course: string}>({ title: "", type: "PDF", url: "", course: "" });
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [isUploading, setIsUploading] = useState(false);
@@ -42,7 +42,7 @@ export default function ResourceMarketplace({ user, isAdmin }: { user?: any, isA
   const [userCourses, setUserCourses] = useState<string[]>([]);
   const [deleteId, setDeleteId] = useState<string | null>(null);
   
-  const { followedUploaders, likedResources, dislikedResources, followUploader, unfollowUploader, toggleLike, toggleDislike } = useAcademicStore();
+  const { followedUploaders, likedResources, dislikedResources, favoriteResources, followUploader, unfollowUploader, toggleLike, toggleDislike, toggleFavorite } = useAcademicStore();
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Fetch user's CGPA courses for personalization
@@ -79,6 +79,22 @@ export default function ResourceMarketplace({ user, isAdmin }: { user?: any, isA
           collection(db, "resources"), 
           where("userId", "==", user.uid),
           orderBy("timestamp", "desc"),
+          limit(10)
+        );
+      } else if (activeTab === "favorites") {
+        // We fetch favorites locally from the current loaded resources or fetch them all if needed
+        // For simplicity with pagination, we'll fetch all favorited IDs if they aren't in memory
+        if (favoriteResources.length === 0) {
+          setResources([]);
+          setHasMore(false);
+          setIsLoading(false);
+          return;
+        }
+        
+        // Firestore 'in' query has a limit of 10-30 usually depending on version, so we fetch them carefully
+        q = query(
+          collection(db, "resources"),
+          where("__name__", "in", favoriteResources.slice(0, 10)),
           limit(10)
         );
       } else {
@@ -267,6 +283,10 @@ export default function ResourceMarketplace({ user, isAdmin }: { user?: any, isA
       );
     });
 
+    if (activeTab === "favorites") {
+      filtered = resources.filter(r => favoriteResources.includes(r.id));
+    }
+
     if (activeTab === "feed") {
       // Prioritize user's courses and then by quality score
       return filtered.sort((a, b) => {
@@ -314,16 +334,22 @@ export default function ResourceMarketplace({ user, isAdmin }: { user?: any, isA
               className="w-full bg-black/5 dark:bg-white/5 border border-[var(--border)] rounded-2xl pl-12 pr-4 py-4 text-lg font-medium focus:outline-none focus:border-cyan-500 transition-all"
             />
           </div>
-          <div className="flex bg-black/5 dark:bg-white/5 p-1 rounded-2xl border border-[var(--border)]">
+          <div className="flex bg-black/5 dark:bg-white/5 p-1 rounded-2xl border border-[var(--border)] overflow-x-auto no-scrollbar">
             <button 
               onClick={() => setActiveTab("feed")}
-              className={`px-6 py-3 rounded-xl text-sm font-bold transition-all ${activeTab === "feed" ? "bg-white dark:bg-zinc-800 shadow-sm text-cyan-600" : "text-[var(--foreground)]/50 hover:text-[var(--foreground)]"}`}
+              className={`px-6 py-3 rounded-xl text-sm font-bold transition-all whitespace-nowrap ${activeTab === "feed" ? "bg-white dark:bg-zinc-800 shadow-sm text-cyan-600" : "text-[var(--foreground)]/50 hover:text-[var(--foreground)]"}`}
             >
               Feed
             </button>
             <button 
+              onClick={() => setActiveTab("favorites")}
+              className={`px-6 py-3 rounded-xl text-sm font-bold transition-all whitespace-nowrap ${activeTab === "favorites" ? "bg-white dark:bg-zinc-800 shadow-sm text-cyan-600" : "text-[var(--foreground)]/50 hover:text-[var(--foreground)]"}`}
+            >
+              Favorites
+            </button>
+            <button 
               onClick={() => setActiveTab("my-uploads")}
-              className={`px-6 py-3 rounded-xl text-sm font-bold transition-all ${activeTab === "my-uploads" ? "bg-white dark:bg-zinc-800 shadow-sm text-cyan-600" : "text-[var(--foreground)]/50 hover:text-[var(--foreground)]"}`}
+              className={`px-6 py-3 rounded-xl text-sm font-bold transition-all whitespace-nowrap ${activeTab === "my-uploads" ? "bg-white dark:bg-zinc-800 shadow-sm text-cyan-600" : "text-[var(--foreground)]/50 hover:text-[var(--foreground)]"}`}
             >
               My Uploads
             </button>
@@ -355,6 +381,12 @@ export default function ResourceMarketplace({ user, isAdmin }: { user?: any, isA
                 <div>
                   <div className="flex justify-between items-start mb-4">
                     <div className="flex items-center gap-2">
+                      <button 
+                        onClick={() => toggleFavorite(resource.id)}
+                        className={`p-2 rounded-xl transition-all ${favoriteResources.includes(resource.id) ? 'bg-rose-500 text-white shadow-lg shadow-rose-500/20' : 'bg-black/5 dark:bg-white/5 text-rose-500 hover:bg-rose-500/10'}`}
+                      >
+                        <Star size={16} className={favoriteResources.includes(resource.id) ? 'fill-white' : ''} />
+                      </button>
                       <div className={`p-2 rounded-xl ${resource.type === 'PDF' ? 'bg-red-500/10 text-red-500' : resource.type === 'Image' ? 'bg-blue-500/10 text-blue-500' : 'bg-emerald-500/10 text-emerald-500'}`}>
                         {resource.type === 'PDF' ? <FileIcon size={20} /> : resource.type === 'Image' ? <ImageIcon size={20} /> : <ExternalLink size={20} />}
                       </div>

@@ -735,8 +735,9 @@ export default function CBT({ user, isFocusMode, setIsFocusMode }: { user: any, 
   return (
     <div className="space-y-8">
       <Helmet>
-        <title>CBT Engine | Digital Nexus</title>
-        <meta name="description" content="Practice exams for GST 111, BUS 101, SOC 101, and AMS 103 on the Digital Nexus CBT Engine." />
+        <title>OAU CBT Engine | GST 111, GST 112 & Post UTME Practice | Digital Nexus</title>
+        <meta name="description" content="Practice OAU CBT past questions for GST 111, GST 112, BUS 101, SOC 101, and AMS 103. Simulate Great Ife exams with timed tests and AI-powered verifications." />
+        <meta name="keywords" content="OAU CBT GST 111, OAU GST 112, OAU Post UTME practice, Great Ife CBT, ICEPAB, OAU past questions, GST 111 PDF, BUS 101 OAU, student portal OAU" />
         <link rel="canonical" href={`${import.meta.env.NEXT_PUBLIC_BASE_URL || 'https://oau.cbt.icepab.name.ng'}/cbt`} />
         <script type="application/ld+json">
           {`
@@ -748,11 +749,11 @@ export default function CBT({ user, isFocusMode, setIsFocusMode }: { user: any, 
                 "position": index + 1,
                 "item": {
                   "@type": "Course",
-                  "name": course.title,
-                  "description": course.description,
+                  "name": `OAU ${course.title} CBT practice`,
+                  "description": `Comprehensive study material and CBT practice for ${course.code} at Obafemi Awolowo University.`,
                   "provider": {
                     "@type": "Organization",
-                    "name": "Digital Nexus",
+                    "name": "ICEPAB Digital Nexus",
                     "sameAs": "${import.meta.env.NEXT_PUBLIC_BASE_URL || 'https://oau.cbt.icepab.name.ng'}"
                   },
                   "courseCode": course.code

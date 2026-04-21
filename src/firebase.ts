@@ -31,15 +31,31 @@ export const rtdb = getDatabase(app);
 // Test connection to Firestore
 async function testConnection() {
   try {
-    // Attempt to fetch a non-existent document from the server to test connectivity
-    await getDocFromServer(doc(db, '_internal_', 'connection_test'));
-    console.log("Firestore connection verified.");
+    const testDoc = doc(db, '_internal_', 'connection_test');
+    await getDocFromServer(testDoc);
+    console.log("✅ Firestore connection verified.");
   } catch (error: any) {
+    console.error("❌ Firestore Connection Error:", error.message);
     if (error.message && error.message.includes('the client is offline')) {
-      console.error("CRITICAL: Firestore connection failed. This usually means the Project ID or Database ID is incorrect.");
-      console.error("Current Project ID:", firebaseConfig.projectId);
-      console.error("Current Database ID:", databaseId);
+      console.error("CRITICAL: Client is offline or database ID is incorrect.");
+    } else if (error.message && error.message.includes('permission-denied')) {
+      console.error("PERMISSION DENIED: Check firestore.rules.");
     }
+    // Check for potential DNS issues with custom domains
+    const isCustomDomain = firebaseConfig.authDomain && !firebaseConfig.authDomain.includes('firebaseapp.com');
+    
+    console.group("Firebase Diagnosis");
+    console.log("Project ID:", firebaseConfig.projectId);
+    console.log("Database ID:", databaseId);
+    console.log("Auth Domain:", firebaseConfig.authDomain);
+    console.log("Current App Domain:", window.location.hostname);
+    if (isCustomDomain) {
+      console.warn(`⚠️ CUSTOM AUTH DOMAIN DETECTED: ${firebaseConfig.authDomain}`);
+      console.warn(`👉 Ensure '${window.location.hostname}' is added to 'Authorized Domains' in Firebase Authentication Console.`);
+      console.warn("👉 If you see NXDOMAIN, check that your custom domain has a CNAME record pointing to Firebase.");
+    }
+    console.log("API Key:", firebaseConfig.apiKey ? "PRESENT" : "MISSING");
+    console.groupEnd();
   }
 }
 

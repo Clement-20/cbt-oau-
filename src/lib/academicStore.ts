@@ -5,11 +5,13 @@ interface AcademicState {
   followedUploaders: string[]; // Array of userIds
   likedResources: string[]; // Array of resourceIds
   dislikedResources: string[]; // Array of resourceIds
+  favoriteResources: string[]; // Array of resourceIds
   aiExplanationsUsed: number;
   followUploader: (userId: string) => void;
   unfollowUploader: (userId: string) => void;
   toggleLike: (resourceId: string) => void;
   toggleDislike: (resourceId: string) => void;
+  toggleFavorite: (resourceId: string) => void;
   incrementAIUsage: () => void;
 }
 
@@ -19,6 +21,7 @@ export const useAcademicStore = create<AcademicState>()(
       followedUploaders: [],
       likedResources: [],
       dislikedResources: [],
+      favoriteResources: [],
       aiExplanationsUsed: 0,
       followUploader: (userId) => 
         set((state) => ({ 
@@ -50,6 +53,15 @@ export const useAcademicStore = create<AcademicState>()(
               : [...state.dislikedResources, resourceId],
             // Remove from likes if disliked
             likedResources: state.likedResources.filter(id => id !== resourceId)
+          };
+        }),
+      toggleFavorite: (resourceId) => 
+        set((state) => {
+          const isFavorited = state.favoriteResources.includes(resourceId);
+          return {
+            favoriteResources: isFavorited 
+              ? state.favoriteResources.filter(id => id !== resourceId)
+              : [...state.favoriteResources, resourceId],
           };
         }),
       incrementAIUsage: () => 

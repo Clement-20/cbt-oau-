@@ -1,8 +1,5 @@
 import React, { useState, useRef, useEffect } from "react";
 import { Send, Bot, User, Loader2, X, Sparkles, BookOpen, MessageSquare, Trash2 } from "lucide-react";
-import { GoogleGenAI } from "@google/genai";
-import { checkAndUseNexusEnergy } from "../utils/nexusUtils";
-import NexusEnergyModal from "./NexusEnergyModal";
 
 interface Message {
   role: "user" | "model";
@@ -49,38 +46,14 @@ export default function StudyDeck({ user, onClose, contextText, initialPrompt }:
     setIsLoading(true);
 
     try {
-      // Check Quota
-      const { allowed } = await checkAndUseNexusEnergy(user.uid);
-      if (!allowed) {
-        setShowEnergyModal(true);
+      // Manual response logic since AI API is removed
+      setTimeout(() => {
+        setMessages(prev => [...prev, { 
+          role: "model", 
+          text: "I'm currently in 'Offline Mode' while we perform systems maintenance on the Nexus Core AI. I can still assist with question verifications in the CBT Engine, but full interactive chat is temporarily restricted. Stay focused on your studies!" 
+        }]);
         setIsLoading(false);
-        return;
-      }
-
-      const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
-      const chat = ai.chats.create({
-        model: "gemini-3-flash-preview",
-        config: {
-          systemInstruction: `You are the Nexus Academic Tutor, a helpful and knowledgeable assistant for OAU students. 
-          Your goal is to explain complex concepts simply, provide study tips, and help students prepare for exams.
-          ${contextText ? `Use this context from the student's study material to help answer: ${contextText.slice(0, 5000)}` : ""}
-          Keep your responses concise, encouraging, and academic.`
-        }
-      });
-
-      // Add a placeholder for the model response
-      setMessages(prev => [...prev, { role: "model", text: "" }]);
-      
-      const streamResponse = await chat.sendMessageStream({ message: messageToSend });
-      
-      for await (const chunk of streamResponse) {
-        setMessages(prev => {
-          const newMessages = [...prev];
-          const lastMessage = newMessages[newMessages.length - 1];
-          lastMessage.text += chunk.text;
-          return newMessages;
-        });
-      }
+      }, 1000);
     } catch (error) {
       console.error("Chat error:", error);
       setMessages(prev => {
@@ -184,7 +157,7 @@ export default function StudyDeck({ user, onClose, contextText, initialPrompt }:
         </p>
       </form>
 
-      {showEnergyModal && <NexusEnergyModal onClose={() => setShowEnergyModal(false)} />}
+      {/* {showEnergyModal && <NexusEnergyModal onClose={() => setShowEnergyModal(false)} />} */}
     </div>
   );
 }

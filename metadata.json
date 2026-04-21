@@ -1,5 +1,5 @@
 {
-  "name": "OAU Digital Nexus",
-  "description": "The OAU Campus OS. Practice CBT, validate questions, track CGPA, and dominate the leaderboard.",
+  "name": "ICEPAB Digital Nexus - OAU ePortal & CBT Hub",
+  "description": "The official OAU student super-app by ICEPAB. Practice OAU CBT GST 111, download GST PDFs, access OAU ePortal, Post UTME past questions, and track CGPA.",
   "requestFramePermissions": []
 }

@@ -3,14 +3,24 @@ import { createServer as createViteServer } from "vite";
 import path from "path";
 import compression from "compression";
 import axios from "axios";
-import { courses } from "./src/lib/questions.ts";
+import { courses } from "./src/lib/questions";
 import { GoogleGenAI } from "@google/genai";
 import rateLimit from "express-rate-limit";
+import * as dotenv from "dotenv";
+
+dotenv.config();
 
 async function startServer() {
   const app = express();
   const PORT = 3000;
-  const BASE_URL = process.env.NEXT_PUBLIC_BASE_URL || "https://oau.cbt.icepab.name.ng";
+  
+  // Health check for Cloud Run
+  app.get("/health", (req, res) => res.status(200).send("OK"));
+
+  // Necessary for rate-limiting and session cookies behind Cloud Run's proxy
+  app.set("trust proxy", 1);
+
+  const BASE_URL = process.env.NEXT_PUBLIC_BASE_URL || "https://icepab-nexus.run.app";
 
   app.use(compression());
   app.use(express.json());

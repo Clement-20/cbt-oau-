@@ -2,9 +2,10 @@ import React, { useState, useRef, useEffect } from "react";
 import { collection, addDoc, serverTimestamp, query, onSnapshot, updateDoc, doc, increment, getDoc, setDoc, arrayUnion, runTransaction } from "firebase/firestore";
 import { handleFirestoreError, OperationType } from "../utils/errorHandling";
 import { db } from "../firebase";
-import { ShieldCheck, Upload, FileText, Check, X, Loader2, Share2, BatteryLow, Type as TypeIcon, Trash2 } from "lucide-react";
+import { ShieldCheck, Upload, FileText, Check, X, Loader2, Share2, BatteryLow, Type as TypeIcon, Trash2, Plus } from "lucide-react";
 import { GoogleGenAI, Type } from "@google/genai";
 import { Helmet } from "react-helmet-async";
+import { motion, AnimatePresence } from "motion/react";
 import { toast } from "../components/Toast";
 import { checkAndUseNexusEnergy } from "../utils/nexusUtils";
 import NexusEnergyModal from "../components/NexusEnergyModal";
@@ -12,10 +13,13 @@ import NexusEnergyModal from "../components/NexusEnergyModal";
 export default function Validator({ user }: { user: any }) {
   const [file, setFile] = useState<File | null>(null);
   const [courseCode, setCourseCode] = useState("");
+  const [manualQuestion, setManualQuestion] = useState("");
+  const [manualOptions, setManualOptions] = useState(["", "", "", ""]);
+  const [correctOption, setCorrectOption] = useState<number | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
   const [pendingQuestions, setPendingQuestions] = useState<any[]>([]);
   const [showEnergyModal, setShowEnergyModal] = useState(false);
-  const [uploadMode, setUploadMode] = useState<"file" | "text">("file");
+  const [uploadMode, setUploadMode] = useState<"manual" | "file" | "text">("manual");
   const [manualText, setManualText] = useState("");
   const [isLoadingQuestions, setIsLoadingQuestions] = useState(true);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -189,7 +193,7 @@ export default function Validator({ user }: { user: any }) {
     try {
       for (const q of questions) {
         await addDoc(collection(db, "pending_questions"), {
-          courseCode: courseCode.toUpperCase(),
+          courseCode: courseCode.toUpperCase().replace(/\s+/g, ''),
           question: q.question,
           options: q.options,
           correctAnswer: q.correctAnswer,
@@ -197,21 +201,37 @@ export default function Validator({ user }: { user: any }) {
           authorEmail: user.email,
           authorName: user.displayName,
           votes: 0,
+          rejects: 0,
           voters: [],
           status: "pending",
           timestamp: serverTimestamp()
         });
       }
 
-      setFile(null);
-      setCourseCode("");
+      setManualQuestion("");
+      setManualOptions(["", "", "", ""]);
+      setCorrectOption(null);
+      setManualText("");
       if (fileInputRef.current) fileInputRef.current.value = "";
-      toast(`Successfully extracted ${questions.length} questions for validation!`);
+      toast(`Successfully submitted ${questions.length} questions for validation!`);
       setIsProcessing(false);
     } catch (error) {
       handleFirestoreError(error, OperationType.CREATE, "pending_questions");
       setIsProcessing(false);
     }
+  };
+
+  const handleManualSubmit = async () => {
+    if (!courseCode || !manualQuestion || manualOptions.some(o => !o) || correctOption === null) {
+      toast("Please fill all fields and select the correct answer.");
+      return;
+    }
+    setIsProcessing(true);
+    await saveQuestions([{
+      question: manualQuestion,
+      options: manualOptions,
+      correctAnswer: correctOption
+    }]);
   };
 
   const voteQuestion = async (q: any, isLegit: boolean) => {
@@ -235,7 +255,8 @@ export default function Validator({ user }: { user: any }) {
           throw new Error("Already voted");
         }
 
-        const newVotes = (data.votes || 0) + (isLegit ? 1 : -1);
+        const newVotes = (data.votes || 0) + (isLegit ? 1 : 0);
+        const newRejects = (data.rejects || 0) + (isLegit ? 0 : 1);
         const newVoters = [...(data.voters || []), user.uid];
 
         if (newVotes >= 20 || isAdmin) {
@@ -265,17 +286,22 @@ export default function Validator({ user }: { user: any }) {
           transaction.update(qRef, { 
             status: "approved",
             voters: newVoters,
-            votes: newVotes
+            votes: newVotes,
+            rejects: newRejects
           });
+        } else if (newRejects >= 10) {
+          // Reject and delete from database
+          transaction.delete(qRef);
         } else {
           transaction.update(qRef, {
             votes: newVotes,
+            rejects: newRejects,
             voters: newVoters
           });
         }
       });
       
-      if (isAdmin) {
+      if (isAdmin && isLegit) {
         toast("Question approved by Admin!");
       } else {
         toast("Vote recorded successfully!");
@@ -323,9 +349,9 @@ export default function Validator({ user }: { user: any }) {
       </Helmet>
       <div>
         <h1 className="text-3xl font-bold tracking-tighter flex items-center gap-3">
-          <ShieldCheck className="text-emerald-600 dark:text-emerald-500" /> Validator
+          <ShieldCheck className="text-emerald-600 dark:text-emerald-500" /> Submit & Validate Questions
         </h1>
-        <p className="text-[var(--foreground)]/60 mt-2 font-medium">Upload materials, let AI parse them, and crowdsource verification.</p>
+        <p className="text-[var(--foreground)]/60 mt-2 font-medium">Submit questions manually. They need 20 user validations to join the question bank.</p>
       </div>
 
       <div className="grid lg:grid-cols-2 gap-8">
@@ -333,9 +359,15 @@ export default function Validator({ user }: { user: any }) {
         <div className="glass-panel p-8 rounded-3xl shadow-sm space-y-6 h-fit">
           <div className="flex items-center justify-between">
             <h2 className="text-2xl font-bold flex items-center gap-2">
-              <Upload size={24} className="text-emerald-600 dark:text-emerald-500" /> Submit Questions
+              <Upload size={24} className="text-emerald-600 dark:text-emerald-500" /> Add New Question
             </h2>
             <div className="flex bg-black/5 dark:bg-white/5 p-1 rounded-xl">
+              <button 
+                onClick={() => setUploadMode("manual")}
+                className={`px-4 py-1.5 rounded-lg text-xs font-bold transition-all ${uploadMode === "manual" ? 'bg-emerald-600 text-white shadow-md' : 'text-[var(--foreground)]/60 hover:text-[var(--foreground)]'}`}
+              >
+                Manual
+              </button>
               <button 
                 onClick={() => setUploadMode("file")}
                 className={`px-4 py-1.5 rounded-lg text-xs font-bold transition-all ${uploadMode === "file" ? 'bg-emerald-600 text-white shadow-md' : 'text-[var(--foreground)]/60 hover:text-[var(--foreground)]'}`}
@@ -353,46 +385,111 @@ export default function Validator({ user }: { user: any }) {
           
           <div className="space-y-5">
             <div>
-              <label className="block text-sm font-bold text-[var(--foreground)]/80 mb-2">Course Code</label>
+              <label className="block text-sm font-bold text-[var(--foreground)]/80 mb-2">Course Code (e.g., GST101)</label>
               <input
                 type="text"
-                placeholder="e.g. MTH 101"
+                placeholder="GST101"
                 value={courseCode}
                 onChange={(e) => setCourseCode(e.target.value)}
                 className="w-full bg-black/5 dark:bg-black/50 border border-[var(--border)] rounded-2xl p-4 text-[var(--foreground)] placeholder:text-[var(--foreground)]/30 focus:outline-none focus:ring-2 focus:ring-emerald-500 uppercase font-medium transition-all"
               />
             </div>
-            
-            {uploadMode === "file" ? (
-              <div>
-                <label className="block text-sm font-bold text-[var(--foreground)]/80 mb-2">Material (Image/PDF/TXT)</label>
-                <input
-                  type="file"
-                  accept="image/*,application/pdf,text/plain"
-                  onChange={handleFileChange}
-                  ref={fileInputRef}
-                  className="w-full bg-black/5 dark:bg-black/50 border border-[var(--border)] rounded-2xl p-4 text-[var(--foreground)]/60 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-bold file:bg-emerald-500/10 file:text-emerald-600 dark:file:text-emerald-400 hover:file:bg-emerald-500/20 transition-all cursor-pointer"
-                />
+
+            {uploadMode === "manual" ? (
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-bold text-[var(--foreground)]/80 mb-2">Question</label>
+                  <textarea
+                    placeholder="Enter the question text here..."
+                    value={manualQuestion}
+                    onChange={(e) => setManualQuestion(e.target.value)}
+                    className="w-full bg-black/5 dark:bg-black/50 border border-[var(--border)] rounded-2xl p-4 text-[var(--foreground)] placeholder:text-[var(--foreground)]/30 focus:outline-none focus:ring-2 focus:ring-emerald-500 h-24 font-medium transition-all resize-none"
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <label className="block text-sm font-bold text-[var(--foreground)]/80 mb-1">Options (Required: Exactly 4)</label>
+                  {["A", "B", "C", "D"].map((label, idx) => (
+                    <div key={label} className="flex items-center gap-3">
+                      <span className={`w-8 h-8 flex items-center justify-center rounded-lg font-bold text-xs ${correctOption === idx ? 'bg-emerald-600 text-white' : 'bg-emerald-100 text-emerald-600'}`}>{label}</span>
+                      <input
+                        type="text"
+                        placeholder={`Option ${label}`}
+                        value={manualOptions[idx]}
+                        onChange={(e) => {
+                          const newOpts = [...manualOptions];
+                          newOpts[idx] = e.target.value;
+                          setManualOptions(newOpts);
+                        }}
+                        className="flex-1 bg-black/5 dark:bg-black/20 border border-[var(--border)] rounded-xl p-3 text-sm focus:outline-none focus:ring-1 focus:ring-emerald-500"
+                      />
+                    </div>
+                  ))}
+                </div>
+
+                <div>
+                  <label className="block text-sm font-bold text-[var(--foreground)]/80 mb-3">Select Correct Answer</label>
+                  <div className="flex gap-2">
+                    {["A", "B", "C", "D"].map((label, idx) => (
+                      <button
+                        key={label}
+                        onClick={() => setCorrectOption(idx)}
+                        className={`flex-1 py-3 rounded-xl font-bold transition-all border ${correctOption === idx ? 'bg-emerald-600 text-white border-emerald-500 shadow-md scale-105' : 'bg-black/5 dark:bg-white/5 border-[var(--border)] text-[var(--foreground)]/60 hover:bg-black/10'}`}
+                      >
+                        {label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <button
+                  onClick={handleManualSubmit}
+                  disabled={isProcessing || !courseCode || !manualQuestion || manualOptions.some(o => !o) || correctOption === null}
+                  className="w-full flex items-center justify-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white px-6 py-4 rounded-2xl font-bold transition-all shadow-md disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {isProcessing ? <><Loader2 className="animate-spin" size={20} /> Submitting...</> : <><Plus size={20} /> Submit Question</>}
+                </button>
+              </div>
+            ) : uploadMode === "file" ? (
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-bold text-[var(--foreground)]/80 mb-2">Material (Image/PDF/TXT)</label>
+                  <input
+                    type="file"
+                    accept="image/*,application/pdf,text/plain"
+                    onChange={handleFileChange}
+                    ref={fileInputRef}
+                    className="w-full bg-black/5 dark:bg-black/50 border border-[var(--border)] rounded-2xl p-4 text-[var(--foreground)]/60 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-bold file:bg-emerald-500/10 file:text-emerald-600 dark:file:text-emerald-400 hover:file:bg-emerald-500/20 transition-all cursor-pointer"
+                  />
+                </div>
+                <button
+                  onClick={processUpload}
+                  disabled={isProcessing || !file || !courseCode}
+                  className="w-full flex items-center justify-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white px-6 py-4 rounded-2xl font-bold transition-all shadow-md disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {isProcessing ? <><Loader2 className="animate-spin" size={20} /> Processing...</> : "Submit for AI Extraction"}
+                </button>
               </div>
             ) : (
-              <div>
-                <label className="block text-sm font-bold text-[var(--foreground)]/80 mb-2">Paste Questions</label>
-                <textarea
-                  placeholder="Paste your questions here. AI will structure them for you..."
-                  value={manualText}
-                  onChange={(e) => setManualText(e.target.value)}
-                  className="w-full bg-black/5 dark:bg-black/50 border border-[var(--border)] rounded-2xl p-4 text-[var(--foreground)] placeholder:text-[var(--foreground)]/30 focus:outline-none focus:ring-2 focus:ring-emerald-500 h-32 font-medium transition-all resize-none"
-                />
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-bold text-[var(--foreground)]/80 mb-2">Paste Questions</label>
+                  <textarea
+                    placeholder="Paste your questions here. AI will structure them for you..."
+                    value={manualText}
+                    onChange={(e) => setManualText(e.target.value)}
+                    className="w-full bg-black/5 dark:bg-black/50 border border-[var(--border)] rounded-2xl p-4 text-[var(--foreground)] placeholder:text-[var(--foreground)]/30 focus:outline-none focus:ring-2 focus:ring-emerald-500 h-32 font-medium transition-all resize-none"
+                  />
+                </div>
+                <button
+                  onClick={processUpload}
+                  disabled={isProcessing || !manualText || !courseCode}
+                  className="w-full flex items-center justify-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white px-6 py-4 rounded-2xl font-bold transition-all shadow-md disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {isProcessing ? <><Loader2 className="animate-spin" size={20} /> Processing...</> : "Submit for AI Extraction"}
+                </button>
               </div>
             )}
-
-            <button
-              onClick={processUpload}
-              disabled={isProcessing || (uploadMode === "file" ? !file : !manualText) || !courseCode}
-              className="w-full flex items-center justify-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white px-6 py-4 rounded-2xl font-bold transition-all shadow-md disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              {isProcessing ? <><Loader2 className="animate-spin" size={20} /> Processing...</> : "Submit for Validation"}
-            </button>
           </div>
         </div>
 
@@ -446,7 +543,8 @@ export default function Validator({ user }: { user: any }) {
                       >
                         <Share2 size={12} /> Invite
                       </button>
-                      <span className="text-xs font-mono font-bold text-[var(--foreground)]/50 bg-black/5 dark:bg-white/10 px-3 py-1 rounded-full">Votes: {q.votes}/20</span>
+                      <span className="text-xs font-mono font-bold text-[var(--foreground)]/50 bg-black/5 dark:bg-white/10 px-3 py-1 rounded-full">Validations: {q.votes}/20</span>
+                      <span className="text-xs font-mono font-bold text-red-500 bg-red-500/5 px-3 py-1 rounded-full">Rejects: {q.rejects || 0}/10</span>
                     </div>
                   </div>
                   <p className="font-semibold text-lg leading-snug">{q.question}</p>
@@ -480,6 +578,41 @@ export default function Validator({ user }: { user: any }) {
         </div>
       </div>
       {showEnergyModal && <NexusEnergyModal onClose={() => setShowEnergyModal(false)} />}
+      
+      {/* AI Processing Overlay */}
+      <AnimatePresence>
+        {isProcessing && (
+          <motion.div 
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[150] flex items-center justify-center bg-black/60 backdrop-blur-md"
+          >
+            <div className="text-center space-y-6 max-w-sm px-6">
+              <div className="relative mx-auto w-24 h-24">
+                <div className="absolute inset-0 bg-emerald-500/20 rounded-full animate-ping"></div>
+                <div className="relative bg-emerald-600 text-white rounded-full w-24 h-24 flex items-center justify-center shadow-2xl shadow-emerald-500/40">
+                  <Loader2 className="animate-spin" size={40} />
+                </div>
+              </div>
+              <div>
+                <h3 className="text-2xl font-black tracking-tighter text-white">AI Extraction In Progress</h3>
+                <p className="text-emerald-100/60 font-medium mt-2">Consulting ICEPAB Knowledge Base and structuring your academic material...</p>
+              </div>
+              <div className="flex justify-center gap-1">
+                {[0, 1, 2].map(i => (
+                  <motion.div
+                    key={i}
+                    animate={{ scale: [1, 1.5, 1] }}
+                    transition={{ repeat: Infinity, duration: 1, delay: i * 0.2 }}
+                    className="w-2 h-2 bg-emerald-400 rounded-full"
+                  />
+                ))}
+              </div>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }

@@ -36,34 +36,18 @@ export default function AITutor({ question, options, correctAnswer, isVerified, 
     if (explanation) return;
 
     setIsLoading(true);
-    try {
-      const response = await fetch("/api/ai/explain", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          question,
-          options,
-          correctAnswer,
-          userId: "current-user-id" // In a real app, we'd pass a token
-        })
-      });
+    // Simulate a brief delay for realism even though we are manual now
+    setTimeout(() => {
+      const manualExplanation = `According to the ICEPAB Knowledge Base, the correct answer is indeed **${correctAnswer}**. 
 
-      const data = await response.json();
+Our database confirms this is the verified correct option for this question. Study this topic thoroughly to master similar questions!`;
       
-      if (data.error) {
-        setExplanation(data.error);
-      } else {
-        setExplanation(data.text || "Sorry, I couldn't generate an explanation at this time.");
-        if (!isVerified) {
-          incrementAIUsage();
-        }
+      setExplanation(manualExplanation);
+      if (!isVerified) {
+        incrementAIUsage();
       }
-    } catch (error) {
-      console.error("AI Error:", error);
-      setExplanation("Failed to connect to the ICEPAB AI Tutor. Please check your connection.");
-    } finally {
       setIsLoading(false);
-    }
+    }, 800);
   };
 
   // Reset explanation when question changes

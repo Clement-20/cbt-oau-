@@ -23,13 +23,15 @@ export default function About() {
   return (
     <div className="max-w-4xl mx-auto space-y-12 py-8">
       <Helmet>
-        <title>About Us | Digital Nexus</title>
+        <title>About Digital Nexus | ICEPAB OAU Super-App</title>
+        <meta name="description" content="Learn about Digital Nexus by ICEPAB, the ultimate platform for OAU student excellence. Featuring OAU CBT past questions, ePortal integration, and Post UTME prep." />
+        <meta name="keywords" content="ICEPAB about, Clement IfeOluwa, Nova xit, Digital Nexus team, OAU student super-app, OAU CBT platform, Post UTME OAU hub" />
       </Helmet>
 
       <div className="text-center space-y-4">
-        <h1 className="text-5xl font-bold tracking-tighter">About Digital Nexus</h1>
+        <h1 className="text-5xl font-bold tracking-tighter">About ICEPAB Digital Nexus</h1>
         <p className="text-xl text-[var(--foreground)]/60 max-w-2xl mx-auto">
-          Empowering students through AI-driven education, collaborative resources, and modern examination tools.
+          The ultimate <b>OAU Campus OS</b>. We empower students through verified OAU CBT practice, official <b>OAU ePortal</b> status monitoring, and inclusive academic resources.
         </p>
       </div>
 

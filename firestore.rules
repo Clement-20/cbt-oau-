@@ -1,6 +1,14 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
+    // Global Safety Net
+    match /{document=**} { allow read, write: if false; }
+
+    // Health Check for Connection Test
+    match /_internal_/connection_test {
+      allow read: if true;
+    }
+
     // ===============================================================
     // Helper Functions
     // ===============================================================
@@ -81,8 +89,8 @@ service cloud.firestore {
 
     match /pending_questions/{questionId} {
       allow read: if isAuthenticated();
-      allow create: if isAuthenticated() && hasRequiredFields(['courseCode', 'question', 'options', 'correctAnswer', 'authorId', 'status', 'votes', 'voters', 'timestamp']) && isValidString('question', 1, 1000) && isValidList(request.resource.data.options, 10) && hasOnlyAllowedFields(['courseCode', 'question', 'options', 'correctAnswer', 'authorId', 'status', 'votes', 'voters', 'timestamp']);
-      allow update: if isAuthenticated() && areImmutableFieldsUnchanged(['timestamp', 'authorId']) && hasOnlyAllowedFields(['courseCode', 'question', 'options', 'correctAnswer', 'authorId', 'status', 'votes', 'voters', 'timestamp']);
+      allow create: if isAuthenticated() && hasRequiredFields(['courseCode', 'question', 'options', 'correctAnswer', 'authorId', 'status', 'votes', 'voters', 'timestamp']) && isValidString('question', 1, 1000) && isValidList(request.resource.data.options, 10) && hasOnlyAllowedFields(['courseCode', 'question', 'options', 'correctAnswer', 'authorId', 'authorEmail', 'authorName', 'status', 'votes', 'rejects', 'voters', 'timestamp']);
+      allow update: if isAuthenticated() && areImmutableFieldsUnchanged(['timestamp', 'authorId']) && hasOnlyAllowedFields(['courseCode', 'question', 'options', 'correctAnswer', 'authorId', 'authorEmail', 'authorName', 'status', 'votes', 'rejects', 'voters', 'timestamp']);
       allow delete: if isAuthenticated();
     }
 

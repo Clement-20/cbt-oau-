@@ -219,6 +219,8 @@ function MainApp() {
     };
   }, []);
 
+  const isIframe = window.self !== window.top;
+
   const login = async () => {
     setLoginError(null);
     setIsLoggingIn(true);
@@ -226,36 +228,43 @@ function MainApp() {
     provider.setCustomParameters({
       prompt: 'select_account'
     });
+
     try {
+      // In iframes, popups often fail due to third-party cookie restrictions.
+      // We try popup first, but catch the errors common in these environments.
       await signInWithPopup(auth, provider, browserPopupRedirectResolver);
     } catch (error: any) {
-      console.error("Login failed", error);
-      console.error("Firebase Auth Error Code:", error.code);
+      console.error("Login failed:", error);
+      const errorCode = error.code;
       
-      // Fallback to redirect if popup is blocked or fails
-      const isPopupError = error.code === 'auth/popup-blocked' || 
-                          error.code === 'auth/cancelled-popup-request' || 
-                          error.code === 'auth/popup-closed-by-user';
+      // auth/popup-closed-by-user: User manually closed it or browser terminated it
+      // auth/cancelled-popup-request: Multiple login attempts
+      // auth/popup-blocked: Browser blocked the popup
+      const isPopupIssue = [
+        'auth/popup-closed-by-user',
+        'auth/cancelled-popup-request',
+        'auth/popup-blocked',
+        'auth/internal-error' // Sometimes happens when popup fails to load resources
+      ].includes(errorCode);
 
-      if (isPopupError) {
-        try {
-          console.log("Popup issue detected (closed or blocked), falling back to redirect...");
-          // Show a helpful message while redirecting
-          setLoginError("Popup was closed or blocked. Switching to a more compatible login method... Please wait.");
-          await signInWithRedirect(auth, provider);
-          return; // Redirect will happen
-        } catch (redirectError: any) {
-          console.error("Redirect fallback failed", redirectError);
-          setLoginError(`Login failed: Popup was closed/blocked and redirect also failed. ${redirectError.message || String(redirectError)}`);
+      if (isPopupIssue) {
+        if (isIframe) {
+          setLoginError("Login failed: Authentication popups are restricted in this preview window. Please click the 'Open in New Tab' icon at the top right of this panel to log in securely, or use the link below.");
+        } else {
+          setLoginError("Login window was closed or blocked. Please ensure popups are allowed for this site and try again.");
+          // Fallback to redirect only if not in an iframe (redirects often fail to return to iframes)
+          try {
+            await signInWithRedirect(auth, provider);
+          } catch (reError) {
+            console.error("Redirect fallback failed", reError);
+          }
         }
-      } else if (error.code === 'auth/network-request-failed') {
-        setLoginError("Login failed: Network error. This is often caused by ad blockers, privacy extensions (like Privacy Badger or Brave Shields), or disabled third-party cookies. Please disable them for this site and try again, or open the app in a new tab.");
+      } else if (errorCode === 'auth/network-request-failed' || error.message?.includes('DNS_PROBE_FINISHED_NXDOMAIN')) {
+        setLoginError("Network/DNS Error: Unable to reach the login service. If you are on a custom domain, ensure your Firebase 'Authorized Domains' includes it. Try opening in a new tab.");
       } else {
-        setLoginError(`Login failed: ${error.message || String(error)}`);
+        setLoginError(`Authentication error: ${error.message || errorCode}`);
       }
     } finally {
-      // Only clear loading state if we didn't trigger a redirect
-      // If we did trigger a redirect, the page will reload anyway
       setIsLoggingIn(false);
     }
   };
@@ -305,8 +314,6 @@ function MainApp() {
     { path: "/validate", label: "Validator" },
     { path: "/leaderboard", label: "Leaderboard" },
     { path: "/study-mode", label: "Study Mode" },
-    { path: "/resources", label: "Resources" },
-    { path: "/community", label: "Community", icon: <Users size={14} /> },
     ...(isPaymentEnabled ? [{ path: "/verification", label: "Verify Student", icon: <BadgeCheck size={14} /> }] : []),
     ...(user?.email === "banmekeifeoluwa@gmail.com" ? [{ path: "/admin-dashboard", label: "Admin", icon: <ShieldAlert size={14} /> }] : []),
     { path: "/about", label: "About", icon: <Zap size={14} /> },
@@ -315,20 +322,21 @@ function MainApp() {
   return (
     <div className="min-h-screen bg-[var(--background)] text-[var(--foreground)] font-sans transition-colors duration-300">
       <Helmet>
-        <title>Digital Nexus | OAU Digital Hub by Clement IfeOluwa</title>
-        <meta name="description" content="The ultimate OAU student super-app by Clement IfeOluwa. Practice OAU CBT GST 111, use the OAU CGPA Calculator, and read the OAU Freshers Guide. Built for Great Ife." />
-        <meta name="keywords" content="OAU CBT GST 111, OAU CGPA Calculator, OAU Freshers Guide, Obafemi Awolowo University, Clement IfeOluwa, Digital Nexus, CBT, GST 111, OAU Portal, ICEPAB" />
-        <meta property="og:title" content="Digital Nexus | OAU Digital Hub by Clement IfeOluwa" />
-        <meta property="og:description" content="The ultimate OAU student super-app. Practice OAU CBT GST 111, use the OAU CGPA Calculator, and read the OAU Freshers Guide." />
+        <title>Digital Nexus | OAU CBT, ePortal Hub & Study PDFs by Clement IfeOluwa</title>
+        <meta name="description" content="Digital Nexus by ICEPAB: The ultimate OAU student super-app. Practice OAU CBT for GST 111, GST 112, BUS 101. Access OAU ePortal, download OAU study PDFs, and prepare for OAU Post UTME." />
+        <meta name="keywords" content="ICEPAB, Digital Nexus, OAU CBT, GST 111 OAU, OAU ePortal login, OAU student portal, OAU Post UTME past questions, OAU CGPA Calculator, GST 111 PDF download, OAU GST 112, OAU academic resources, Clement IfeOluwa, Great Ife digital hub" />
+        <meta property="og:title" content="Digital Nexus | OAU CBT Hub & ePortal Access" />
+        <meta property="og:description" content="The ultimate OAU student super-app. Practice OAU CBT GST 111, access OAU ePortal, and download study PDFs." />
         <meta property="og:type" content="website" />
         <meta property="og:url" content={`${import.meta.env.NEXT_PUBLIC_BASE_URL || 'https://oau.cbt.icepab.name.ng'}${location.pathname}`} />
-        <meta property="og:image" content={`${import.meta.env.NEXT_PUBLIC_BASE_URL || 'https://icepab-nexus.run.app'}/og-image.png`} />
-        <link rel="canonical" href={`${import.meta.env.NEXT_PUBLIC_BASE_URL || 'https://icepab-nexus.run.app'}${location.pathname}${location.search}`} />
+        <meta property="og:image" content={`${import.meta.env.NEXT_PUBLIC_BASE_URL || 'https://oau.cbt.icepab.name.ng'}/og-image.png`} />
+        <link rel="canonical" href={`${import.meta.env.NEXT_PUBLIC_BASE_URL || 'https://oau.cbt.icepab.name.ng'}${location.pathname}${location.search}`} />
         <meta name="twitter:card" content="summary_large_image" />
-        <meta name="twitter:title" content="Digital Nexus | OAU Digital Hub" />
-        <meta name="twitter:description" content="The ultimate OAU student super-app. Practice OAU CBT GST 111, use the OAU CGPA Calculator, and read the OAU Freshers Guide." />
+        <meta name="twitter:title" content="Digital Nexus | OAU Digital Hub & CBT Engine" />
+        <meta name="twitter:description" content="Practice OAU CBT, access ePortal, and dominate your exams with Digital Nexus." />
         <meta name="theme-color" content="#2563eb" />
         <meta name="robots" content="index, follow" />
+        <meta name="author" content="Clement IfeOluwa" />
       </Helmet>
       <nav className={clsx(
         "border-b border-[var(--border)] p-4 sticky top-0 bg-[var(--background)]/80 backdrop-blur-xl z-50 shadow-sm transition-transform duration-500",
@@ -459,13 +467,29 @@ function MainApp() {
           <div className="mb-6 bg-red-500/10 border border-red-500/20 text-red-600 dark:text-red-400 p-4 rounded-xl flex items-start gap-3">
             <ShieldAlert className="shrink-0 mt-0.5" size={20} />
             <div className="flex-1">
-              <p className="font-medium">{loginError}</p>
-              <button 
-                onClick={() => setLoginError(null)} 
-                className="mt-2 text-sm underline hover:no-underline"
-              >
-                Dismiss
-              </button>
+              <p className="font-medium text-sm leading-relaxed">{loginError}</p>
+              <div className="mt-3 flex flex-wrap gap-3">
+                <button 
+                  onClick={() => setLoginError(null)} 
+                  className="text-xs font-bold bg-red-500/10 px-3 py-1.5 rounded-lg hover:bg-red-500/20 transition-colors"
+                >
+                  Dismiss
+                </button>
+                <a 
+                  href={window.location.origin} 
+                  target="_blank" 
+                  rel="noopener noreferrer"
+                  className="text-xs font-bold bg-blue-600 text-white px-3 py-1.5 rounded-lg hover:bg-blue-700 transition-colors inline-block"
+                >
+                  Open in New Tab
+                </a>
+                <button 
+                  onClick={login}
+                  className="text-xs font-bold border border-blue-600 text-blue-600 px-3 py-1.5 rounded-lg hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-colors"
+                >
+                  Try Again
+                </button>
+              </div>
             </div>
           </div>
         )}
@@ -510,7 +534,7 @@ function MainApp() {
           {...shareData}
         />
       )}
-      {!isAIChatPage && !showStudyDeck && <FloatingAI />}
+      {/* {!isAIChatPage && !showStudyDeck && <FloatingAI />} */}
       {showStudyDeck && (
         <StudyDeck 
           user={user} 

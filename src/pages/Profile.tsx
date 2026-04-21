@@ -2,7 +2,7 @@ import React, { useState, useEffect } from "react";
 import { doc, getDoc, updateDoc, collection, query, where, getDocs, count } from "firebase/firestore";
 import { handleFirestoreError, OperationType } from "../utils/errorHandling";
 import { db } from "../firebase";
-import { User, BadgeCheck, Upload, CreditCard, CheckCircle2, Loader2, Save, Flame, Clock, Target, Share2, ThumbsUp, Users, Twitter, Linkedin, ExternalLink } from "lucide-react";
+import { User, BadgeCheck, Upload, CreditCard, CheckCircle2, Loader2, Save, Flame, Clock, Target, Share2, ThumbsUp, Users, Twitter, Linkedin, ExternalLink, Star, FileText } from "lucide-react";
 import { Helmet } from "react-helmet-async";
 import { toast } from "../components/Toast";
 import { subscribeToSettings } from "../lib/settings";
@@ -26,7 +26,9 @@ export default function Profile({ user }: { user: any }) {
     followers: 0
   });
 
-  const { followedUploaders } = useAcademicStore();
+  const { followedUploaders, favoriteResources } = useAcademicStore();
+  const [favoriteMaterials, setFavoriteMaterials] = useState<any[]>([]);
+  const [loadingFavorites, setLoadingFavorites] = useState(false);
 
   useEffect(() => {
     if (!user) return;
@@ -57,7 +59,6 @@ export default function Profile({ user }: { user: any }) {
         });
 
         // Fetch Followers (Query users where followedUploaders contains user.uid)
-        // Note: This might be expensive, in a real app we'd store a counter
         const followersQ = query(collection(db, "users"), where("followedUploaders", "array-contains", user.uid));
         const followersSnap = await getDocs(followersQ);
 
@@ -73,12 +74,32 @@ export default function Profile({ user }: { user: any }) {
         setLoading(false);
       }
     };
+
+    const fetchFavorites = async () => {
+      if (favoriteResources.length === 0) {
+        setFavoriteMaterials([]);
+        return;
+      }
+      setLoadingFavorites(true);
+      try {
+        const q = query(collection(db, "resources"), where("__name__", "in", favoriteResources.slice(0, 10)));
+        const snap = await getDocs(q);
+        const mats = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        setFavoriteMaterials(mats);
+      } catch (e) {
+        console.error("Error fetching favorites", e);
+      } finally {
+        setLoadingFavorites(false);
+      }
+    };
+
     fetchProfileData();
+    fetchFavorites();
 
     return () => {
       unsubscribeSettings();
     };
-  }, [user]);
+  }, [user, favoriteResources]);
 
   const handleSaveProfile = async () => {
     if (!user || !displayName.trim()) return;
@@ -299,6 +320,51 @@ export default function Profile({ user }: { user: any }) {
                 </div>
               </div>
             </div>
+          </div>
+        )}
+      </div>
+
+      {/* Saved Materials Section */}
+      <div className="glass-panel p-8 rounded-[40px] shadow-sm space-y-6">
+        <div className="flex justify-between items-center">
+          <h2 className="text-2xl font-black tracking-tighter flex items-center gap-2">
+            <Star className="text-rose-500 fill-rose-500" size={24} /> Saved Materials
+          </h2>
+          <Link to="/resources" className="text-xs font-bold text-blue-600 hover:underline px-4 py-2 bg-blue-50 dark:bg-blue-900/20 rounded-xl">View All</Link>
+        </div>
+
+        {loadingFavorites ? (
+          <div className="flex justify-center py-8">
+            <Loader2 className="animate-spin text-blue-500" size={24} />
+          </div>
+        ) : favoriteMaterials.length > 0 ? (
+          <div className="space-y-3">
+            {favoriteMaterials.map((mat) => (
+              <a 
+                key={mat.id}
+                href={mat.url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center justify-between p-4 bg-black/5 dark:bg-white/5 border border-[var(--border)] rounded-2xl hover:bg-rose-500/5 hover:border-rose-500/30 transition-all group"
+              >
+                <div className="flex items-center gap-4">
+                  <div className={`p-2 rounded-xl ${mat.type === 'PDF' ? 'bg-red-500/10 text-red-500' : mat.type === 'Image' ? 'bg-blue-500/10 text-blue-500' : 'bg-emerald-500/10 text-emerald-500'}`}>
+                    <FileText size={20} />
+                  </div>
+                  <div>
+                    <div className="font-bold text-sm tracking-tight group-hover:text-rose-600 transition-colors">{mat.title}</div>
+                    <div className="text-[10px] font-bold text-[var(--foreground)]/40 uppercase tracking-widest">{mat.course} • {mat.type}</div>
+                  </div>
+                </div>
+                <ExternalLink size={16} className="text-[var(--foreground)]/20 group-hover:text-rose-500 transition-opacity" />
+              </a>
+            ))}
+          </div>
+        ) : (
+          <div className="text-center py-12 bg-black/5 dark:bg-white/5 rounded-3xl border-2 border-dashed border-[var(--border)]">
+            <Star className="mx-auto text-[var(--foreground)]/10 mb-4" size={40} />
+            <p className="text-sm font-bold text-[var(--foreground)]/40">You haven't saved any materials yet.</p>
+            <Link to="/resources" className="text-xs font-black text-rose-500 uppercase mt-4 inline-block hover:underline">Browse Marketplace</Link>
           </div>
         )}
       </div>

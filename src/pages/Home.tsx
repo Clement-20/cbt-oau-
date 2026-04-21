@@ -100,9 +100,9 @@ export default function Home({ user, login, isLoggingIn }: { user: any, login?: 
   return (
     <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="space-y-8">
       <Helmet>
-        <title>Home | Digital Nexus - OAU Student Super-App</title>
-        <meta name="description" content="Welcome to Digital Nexus, the ultimate OAU student super-app. Practice OAU CBT GST 111, use the OAU CGPA Calculator, and access OAU student resources." />
-        <meta name="keywords" content="OAU CBT GST 111, OAU CGPA Calculator, OAU Freshers Guide, Obafemi Awolowo University, ICEPAB, OAU student portal, OAU E-Portal, Great Ife, OAU Nexus" />
+        <title>Home | Digital Nexus - OAU Student Portal & CBT Hub</title>
+        <meta name="description" content="Access OAU ePortal, practice OAU CBT questions for GST 111, GST 112, and download OAU study PDFs. Digital Nexus by ICEPAB is the #1 hub for OAU Post UTME and academic excellence." />
+        <meta name="keywords" content="OAU ePortal login, OAU student portal, OAU CBT past questions, GST 111 OAU, GST 112 OAU, OAU Post UTME questions, OAU CGPA Calculator, ICEPAB, Digital Nexus, Great Ife, OAU academic calendar, OAU Freshers Guide" />
         <link rel="canonical" href={`${import.meta.env.NEXT_PUBLIC_BASE_URL || 'https://oau.cbt.icepab.name.ng'}/`} />
         <script type="application/ld+json">
           {`
@@ -111,12 +111,46 @@ export default function Home({ user, login, isLoggingIn }: { user: any, login?: 
               "@type": "WebSite",
               "name": "Digital Nexus",
               "url": "${import.meta.env.NEXT_PUBLIC_BASE_URL || 'https://oau.cbt.icepab.name.ng'}",
-              "description": "The ultimate OAU student super-app. Practice OAU CBT GST 111, use the OAU CGPA Calculator, and read the OAU Freshers Guide.",
+              "description": "The ultimate OAU student super-app by ICEPAB. Practice OAU CBT GST 111, access OAU ePortal, and download study PDFs.",
               "potentialAction": {
                 "@type": "SearchAction",
                 "target": "${import.meta.env.NEXT_PUBLIC_BASE_URL || 'https://oau.cbt.icepab.name.ng'}/cbt?q={search_term_string}",
                 "query-input": "required name=search_term_string"
               }
+            }
+          `}
+        </script>
+        <script type="application/ld+json">
+          {`
+            {
+              "@context": "https://schema.org",
+              "@type": "FAQPage",
+              "mainEntity": [
+                {
+                  "@type": "Question",
+                  "name": "How do I access the OAU ePortal?",
+                  "acceptedAnswer": {
+                    "@type": "Answer",
+                    "text": "You can access the OAU ePortal directly through Digital Nexus by clicking the 'OAU Portal' quick link or visiting eportal.oauife.edu.ng. Our Portal Pulse feature provides real-time status updates."
+                  }
+                },
+                {
+                  "@type": "Question",
+                  "name": "Where can I find OAU CBT past questions for GST 111?",
+                  "acceptedAnswer": {
+                    "@type": "Answer",
+                    "text": "Digital Nexus offers a comprehensive CBT Engine with verified past questions for GST 111, GST 112, and various OAU courses, optimized for the ICEPAB academic standard."
+                  }
+                },
+                {
+                  "@type": "Question",
+                  "name": "Can I download OAU course PDFs on Digital Nexus?",
+                  "acceptedAnswer": {
+                    "@type": "Answer",
+                    "text": "Yes, our resource library includes OAU study PDFs for various courses which can be accessed to prepare for exams and Post UTME."
+                  }
+                }
+              ]
             }
           `}
         </script>
@@ -184,7 +218,7 @@ export default function Home({ user, login, isLoggingIn }: { user: any, login?: 
           
           <div className="space-y-4 relative z-10">
             <div className="flex items-center gap-2 text-sm font-bold text-[var(--foreground)]/50 uppercase tracking-wider">
-              <Activity size={16} /> Live Portal Pulse
+              <Activity size={16} /> Official OAU Student ePortal Status
             </div>
             <div className={`p-5 rounded-2xl border backdrop-blur-md shadow-sm cursor-pointer hover:scale-[1.02] transition-transform ${
               portalStatus.status === "ONLINE" ? "bg-emerald-500/10 border-emerald-500/20 text-emerald-700 dark:text-emerald-400" :
@@ -258,11 +292,33 @@ export default function Home({ user, login, isLoggingIn }: { user: any, login?: 
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 mt-8">
-        <div className="lg:col-span-1 glass-panel p-6 rounded-3xl">
+        <div className="lg:col-span-3 glass-panel p-6 rounded-3xl">
           <FlashcardEngine />
         </div>
-        <div className="lg:col-span-2 glass-panel p-6 rounded-3xl">
-          <ResourceVault user={user} isAdmin={user?.email === "banmekeifeoluwa@gmail.com"} />
+      </div>
+
+      {/* SEO FAQ Section */}
+      <div className="mt-12 space-y-8">
+        <h2 className="text-3xl font-black tracking-tighter text-center">Frequently Asked Questions</h2>
+        <div className="grid md:grid-cols-2 gap-6">
+          <div className="glass-panel p-6 rounded-3xl border border-[var(--border)]">
+            <h3 className="font-bold text-lg mb-2">What is Digital Nexus by ICEPAB?</h3>
+            <p className="text-sm text-[var(--foreground)]/60 leading-relaxed font-menu">
+              Digital Nexus is the premier academic companion for OAU students. It provides a state-of-the-art CBT Engine, direct OAU ePortal access, CGPA calculation, and verified OAU study resources, curated by Clement IfeOluwa and the ICEPAB team.
+            </p>
+          </div>
+          <div className="glass-panel p-6 rounded-3xl border border-[var(--border)]">
+            <h3 className="font-bold text-lg mb-2">How does the OAU CBT Engine work?</h3>
+            <p className="text-sm text-[var(--foreground)]/60 leading-relaxed font-menu">
+              Our CBT Engine simulates the official OAU examination environment. Students can practice GST 111, GST 112, and Post UTME past questions with real-time analytics and performance tracking to ensure exam success.
+            </p>
+          </div>
+          <div className="glass-panel p-6 rounded-3xl border border-[var(--border)] text-center md:col-span-2">
+            <h3 className="font-bold text-lg mb-2 italic underline decoration-blue-500">Official OAU ePortal Affiliation</h3>
+            <p className="text-sm text-[var(--foreground)]/60 leading-relaxed font-menu max-w-2xl mx-auto">
+              Digital Nexus provides the fastest gateway to the <b>OAU Student Portal (ePortal)</b>. We monitor the portal status 24/7 to help Great Ife students stay updated on registration, fees, and results without the frustration of downtime.
+            </p>
+          </div>
         </div>
       </div>
     </motion.div>

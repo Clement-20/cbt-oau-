@@ -1,4 +1,4 @@
 User-agent: *
 Allow: /
 
-Sitemap: https://icepab-nexus.web.app/sitemap.xml
+Sitemap: https://oau.cbt.icepab.name.ng/sitemap.xml
