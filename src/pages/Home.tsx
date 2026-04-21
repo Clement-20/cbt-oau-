@@ -101,8 +101,8 @@ export default function Home({ user, login, isLoggingIn }: { user: any, login?: 
     <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="space-y-8">
       <Helmet>
         <title>Home | Digital Nexus - OAU Student Portal & CBT Hub</title>
-        <meta name="description" content="Access OAU ePortal, practice OAU CBT questions for GST 111, GST 112, and download OAU study PDFs. Digital Nexus by ICEPAB is the #1 hub for OAU Post UTME and academic excellence." />
-        <meta name="keywords" content="OAU ePortal login, OAU student portal, OAU CBT past questions, GST 111 OAU, GST 112 OAU, OAU Post UTME questions, OAU CGPA Calculator, ICEPAB, Digital Nexus, Great Ife, OAU academic calendar, OAU Freshers Guide" />
+        <meta name="description" content="Access OAU ePortal, practice OAU CBT questions for ALL courses (GST, Special Electives, etc.), and download OAU study PDFs. Digital Nexus by ICEPAB is the #1 hub for OAU academic excellence." />
+        <meta name="keywords" content="OAU ePortal login, OAU student portal, OAU CBT past questions, All OAU Courses, OAU Post UTME questions, OAU CGPA Calculator, ICEPAB, Digital Nexus, Great Ife, OAU academic calendar" />
         <link rel="canonical" href={`${import.meta.env.NEXT_PUBLIC_BASE_URL || 'https://oau.cbt.icepab.name.ng'}/`} />
         <script type="application/ld+json">
           {`
@@ -111,7 +111,7 @@ export default function Home({ user, login, isLoggingIn }: { user: any, login?: 
               "@type": "WebSite",
               "name": "Digital Nexus",
               "url": "${import.meta.env.NEXT_PUBLIC_BASE_URL || 'https://oau.cbt.icepab.name.ng'}",
-              "description": "The ultimate OAU student super-app by ICEPAB. Practice OAU CBT GST 111, access OAU ePortal, and download study PDFs.",
+              "description": "The ultimate OAU student super-app by ICEPAB. Practice OAU CBT for all courses, access OAU ePortal, and download study PDFs.",
               "potentialAction": {
                 "@type": "SearchAction",
                 "target": "${import.meta.env.NEXT_PUBLIC_BASE_URL || 'https://oau.cbt.icepab.name.ng'}/cbt?q={search_term_string}",
@@ -136,10 +136,10 @@ export default function Home({ user, login, isLoggingIn }: { user: any, login?: 
                 },
                 {
                   "@type": "Question",
-                  "name": "Where can I find OAU CBT past questions for GST 111?",
+                  "name": "Where can I find OAU CBT past questions?",
                   "acceptedAnswer": {
                     "@type": "Answer",
-                    "text": "Digital Nexus offers a comprehensive CBT Engine with verified past questions for GST 111, GST 112, and various OAU courses, optimized for the ICEPAB academic standard."
+                    "text": "Digital Nexus offers a comprehensive CBT Engine with verified past questions for ALL OAU courses including GSTs, Special Electives, and Departmental courses, optimized for the ICEPAB academic standard."
                   }
                 },
                 {
@@ -267,7 +267,7 @@ export default function Home({ user, login, isLoggingIn }: { user: any, login?: 
         <Link to="/cbt" className="glass-panel hover:bg-black/5 dark:hover:bg-white/10 p-6 rounded-3xl transition-all group">
           <BookOpen className="text-blue-600 dark:text-blue-400 mb-4 group-hover:scale-110 transition-transform" size={32} />
           <h3 className="text-lg font-bold mb-2">CBT Engine</h3>
-          <p className="text-sm text-[var(--foreground)]/60 font-medium">Practice exams for GST 111, BUS 101, and more.</p>
+          <p className="text-sm text-[var(--foreground)]/60 font-medium">Practice exams for ALL courses, GSTs, and more.</p>
         </Link>
         <Link to="/gpa" className="glass-panel hover:bg-black/5 dark:hover:bg-white/10 p-6 rounded-3xl transition-all group">
           <Calculator className="text-emerald-600 dark:text-emerald-400 mb-4 group-hover:scale-110 transition-transform" size={32} />
@@ -310,7 +310,7 @@ export default function Home({ user, login, isLoggingIn }: { user: any, login?: 
           <div className="glass-panel p-6 rounded-3xl border border-[var(--border)]">
             <h3 className="font-bold text-lg mb-2">How does the OAU CBT Engine work?</h3>
             <p className="text-sm text-[var(--foreground)]/60 leading-relaxed font-menu">
-              Our CBT Engine simulates the official OAU examination environment. Students can practice GST 111, GST 112, and Post UTME past questions with real-time analytics and performance tracking to ensure exam success.
+              Our CBT Engine simulates the official OAU examination environment. Students can practice past questions for ALL courses with real-time analytics and performance tracking to ensure exam success.
             </p>
           </div>
           <div className="glass-panel p-6 rounded-3xl border border-[var(--border)] text-center md:col-span-2">

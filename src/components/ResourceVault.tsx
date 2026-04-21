@@ -42,8 +42,32 @@ export default function ResourceMarketplace({ user, isAdmin }: { user?: any, isA
   const [userCourses, setUserCourses] = useState<string[]>([]);
   const [deleteId, setDeleteId] = useState<string | null>(null);
   
+  const [isVerifiedUser, setIsVerifiedUser] = useState(false);
+  const [isCheckingVerification, setIsCheckingVerification] = useState(true);
+  
   const { followedUploaders, likedResources, dislikedResources, favoriteResources, followUploader, unfollowUploader, toggleLike, toggleDislike, toggleFavorite } = useAcademicStore();
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Fetch user verification status
+  useEffect(() => {
+    if (!user) {
+      setIsCheckingVerification(false);
+      return;
+    }
+    const fetchVerification = async () => {
+      try {
+        const userSnap = await getDoc(doc(db, "users", user.uid));
+        if (userSnap.exists()) {
+          setIsVerifiedUser(userSnap.data().isVerified || false);
+        }
+      } catch (error) {
+        console.error("Error fetching verification status:", error);
+      } finally {
+        setIsCheckingVerification(false);
+      }
+    };
+    fetchVerification();
+  }, [user]);
 
   // Fetch user's CGPA courses for personalization
   useEffect(() => {
@@ -139,6 +163,10 @@ export default function ResourceMarketplace({ user, isAdmin }: { user?: any, isA
     e.preventDefault();
     if (!user) {
       toast("Please sign in to upload resources");
+      return;
+    }
+    if (!isVerifiedUser && !isAdmin) {
+      toast("Only verified users can upload resources. Visit Profile to get verified.");
       return;
     }
     if (!newResource.title || !newResource.course) {
@@ -316,10 +344,17 @@ export default function ResourceMarketplace({ user, isAdmin }: { user?: any, isA
             <p className="text-sm text-[var(--foreground)]/50 font-medium">Smart materials for the Digital Nexus ecosystem.</p>
           </div>
           <button 
-            onClick={() => setShowUpload(true)}
-            className="bg-cyan-600 hover:bg-cyan-700 text-white px-6 py-3 rounded-2xl font-bold flex items-center gap-2 shadow-lg shadow-cyan-500/20 transition-all active:scale-95"
+            onClick={() => {
+              if (isVerifiedUser || isAdmin) {
+                setShowUpload(true);
+              } else {
+                toast("Verification Required: Only verified students can contribute to the marketplace.");
+              }
+            }}
+            className={`${isVerifiedUser || isAdmin ? 'bg-cyan-600 hover:bg-cyan-700 shadow-cyan-500/20' : 'bg-zinc-500/20 text-zinc-500 cursor-not-allowed'} text-white px-6 py-3 rounded-2xl font-bold flex items-center gap-2 shadow-lg transition-all active:scale-95`}
           >
             <Upload size={20} /> Upload
+            {(!isVerifiedUser && !isAdmin) && <Star size={12} className="text-zinc-400" />}
           </button>
         </div>
 

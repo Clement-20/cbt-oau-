@@ -251,7 +251,7 @@ export default function Profile({ user }: { user: any }) {
           ) : (
             <div className="space-y-6 relative z-10">
               <p className="text-[var(--foreground)]/70 font-bold">
-                Get the official ICEPAB Scholar badge. Verification grants unlimited AI explanations, priority resource ranking, and a professional profile.
+                Get the official ICEPAB Scholar badge. Verification grants unlimited AI explanations, ability to contribute materials to the marketplace, and priority resource ranking.
               </p>
 
               <Link

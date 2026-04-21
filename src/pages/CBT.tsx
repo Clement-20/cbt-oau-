@@ -735,9 +735,9 @@ export default function CBT({ user, isFocusMode, setIsFocusMode }: { user: any, 
   return (
     <div className="space-y-8">
       <Helmet>
-        <title>OAU CBT Engine | GST 111, GST 112 & Post UTME Practice | Digital Nexus</title>
-        <meta name="description" content="Practice OAU CBT past questions for GST 111, GST 112, BUS 101, SOC 101, and AMS 103. Simulate Great Ife exams with timed tests and AI-powered verifications." />
-        <meta name="keywords" content="OAU CBT GST 111, OAU GST 112, OAU Post UTME practice, Great Ife CBT, ICEPAB, OAU past questions, GST 111 PDF, BUS 101 OAU, student portal OAU" />
+        <title>OAU CBT Engine | Practice Past Questions for All Courses | Digital Nexus</title>
+        <meta name="description" content="Practice OAU CBT past questions for ALL courses including GSTs, Special Electives, and Departmental courses. Simulate Great Ife exams with timed tests and AI-powered verifications." />
+        <meta name="keywords" content="OAU CBT practice, OAU past questions, Great Ife CBT, ICEPAB, OAU GST courses, OAU departmental questions, OAU student portal" />
         <link rel="canonical" href={`${import.meta.env.NEXT_PUBLIC_BASE_URL || 'https://oau.cbt.icepab.name.ng'}/cbt`} />
         <script type="application/ld+json">
           {`
@@ -768,7 +768,7 @@ export default function CBT({ user, isFocusMode, setIsFocusMode }: { user: any, 
           <h1 className="text-3xl font-bold tracking-tighter flex items-center gap-3">
             <BookOpen className="text-blue-600 dark:text-blue-500" /> CBT Engine
           </h1>
-          <p className="text-[var(--foreground)]/60 mt-2 font-medium">Practice exams for GST 111, BUS 101, SOC 101, and AMS 103.</p>
+          <p className="text-[var(--foreground)]/60 mt-2 font-medium">Practice exams for ALL courses, GSTs, Special Electives, and more.</p>
         </div>
 
         <div className="flex items-center gap-4">

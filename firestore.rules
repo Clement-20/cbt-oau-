@@ -30,6 +30,11 @@ service cloud.firestore {
       return isSignedIn() && request.auth.uid == userId && isNotBanned();
     }
 
+    function isVerified() {
+      let userPath = /databases/$(database)/documents/users/$(request.auth.uid);
+      return isSignedIn() && exists(userPath) && get(userPath).data.get('isVerified', false) == true;
+    }
+
     function isAdmin() {
       let isDefaultAdmin = request.auth.token.email == "banmekeifeoluwa@gmail.com" && request.auth.token.email_verified == true;
       let userPath = /databases/$(database)/documents/users/$(request.auth.uid);
@@ -145,7 +150,7 @@ service cloud.firestore {
 
     match /resources/{resourceId} {
       allow read: if isAuthenticated() || isAdmin();
-      allow create: if isAuthenticated() && hasRequiredFields(['userId', 'url', 'title', 'type', 'course']) && isValidUrl('url') && hasOnlyAllowedFields(['title', 'type', 'url', 'course', 'uploadedBy', 'userId', 'fileHash', 'timestamp', 'uploaderVerified', 'likes', 'dislikes']);
+      allow create: if (isVerified() || isAdmin()) && hasRequiredFields(['userId', 'url', 'title', 'type', 'course']) && isValidUrl('url') && hasOnlyAllowedFields(['title', 'type', 'url', 'course', 'uploadedBy', 'userId', 'fileHash', 'timestamp', 'uploaderVerified', 'likes', 'dislikes']);
       allow update: if isAuthenticated() && (
         isAdmin() || 
         request.auth.uid == resource.data.userId ||

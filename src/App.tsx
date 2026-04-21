@@ -323,10 +323,10 @@ function MainApp() {
     <div className="min-h-screen bg-[var(--background)] text-[var(--foreground)] font-sans transition-colors duration-300">
       <Helmet>
         <title>Digital Nexus | OAU CBT, ePortal Hub & Study PDFs by Clement IfeOluwa</title>
-        <meta name="description" content="Digital Nexus by ICEPAB: The ultimate OAU student super-app. Practice OAU CBT for GST 111, GST 112, BUS 101. Access OAU ePortal, download OAU study PDFs, and prepare for OAU Post UTME." />
-        <meta name="keywords" content="ICEPAB, Digital Nexus, OAU CBT, GST 111 OAU, OAU ePortal login, OAU student portal, OAU Post UTME past questions, OAU CGPA Calculator, GST 111 PDF download, OAU GST 112, OAU academic resources, Clement IfeOluwa, Great Ife digital hub" />
+        <meta name="description" content="Digital Nexus by ICEPAB: The ultimate OAU student super-app. Practice OAU CBT for ALL courses, GSTs, and Special Electives. Access OAU ePortal, download OAU study PDFs, and prepare for OAU Post UTME." />
+        <meta name="keywords" content="ICEPAB, Digital Nexus, OAU CBT, All OAU Courses, OAU ePortal login, OAU student portal, OAU Post UTME past questions, OAU CGPA Calculator, OAU study PDFs, OAU academic resources, Clement IfeOluwa, Great Ife digital hub" />
         <meta property="og:title" content="Digital Nexus | OAU CBT Hub & ePortal Access" />
-        <meta property="og:description" content="The ultimate OAU student super-app. Practice OAU CBT GST 111, access OAU ePortal, and download study PDFs." />
+        <meta property="og:description" content="The ultimate OAU student super-app. Practice OAU CBT for all courses, access OAU ePortal, and download study PDFs." />
         <meta property="og:type" content="website" />
         <meta property="og:url" content={`${import.meta.env.NEXT_PUBLIC_BASE_URL || 'https://oau.cbt.icepab.name.ng'}${location.pathname}`} />
         <meta property="og:image" content={`${import.meta.env.NEXT_PUBLIC_BASE_URL || 'https://oau.cbt.icepab.name.ng'}/og-image.png`} />
