@@ -29,6 +29,7 @@ const Community = lazy(() => import("./pages/Community"));
 const Verification = lazy(() => import("./pages/Verification"));
 const Resources = lazy(() => import("./pages/Resources"));
 const StudyMode = lazy(() => import("./pages/StudyMode"));
+const AdminSeeder = lazy(() => import("./pages/AdminSeeder"));
 
 import { ErrorBoundary } from "./components/ErrorBoundary";
 import LoadingLogo from "./components/LoadingLogo";
@@ -501,7 +502,8 @@ function MainApp() {
             <Route path="/" element={<Home user={user} login={login} isLoggingIn={isLoggingIn} />} />
             <Route path="/admin-dashboard" element={<Admin user={user} />} />
             <Route path="/icepab-admin" element={<Admin user={user} />} />
-            <Route path="/cbt" element={<CBT user={user} isFocusMode={isFocusMode} setIsFocusMode={setIsFocusMode} />} />
+            <Route path="/admin/seed" element={<AdminSeeder user={user} dbUser={dbUser} />} />
+            <Route path="/cbt" element={<CBT user={user} dbUser={dbUser} isFocusMode={isFocusMode} setIsFocusMode={setIsFocusMode} />} />
             <Route path="/validate" element={<Validator user={user} />} />
             <Route path="/leaderboard" element={<Leaderboard user={user} />} />
             <Route path="/gpa" element={<GPA user={user} />} />
@@ -519,10 +521,10 @@ function MainApp() {
 
       <footer className="max-w-7xl mx-auto p-8 border-t border-[var(--border)] text-center space-y-4 opacity-60">
         <p className="text-sm font-medium">
-          Copyright ©️ Clement IfeOluwa ❄️🧊 {new Date().getFullYear()}
+          Copyright ©️ ICEPAB Digital Nexus {new Date().getFullYear()}
         </p>
-        <p className="text-xs">
-          Lead Developer: Clement IfeOluwa ❄️🧊 | Co-developer: Nova xit
+        <p className="text-xs italic">
+          The official OAU Student Super-App. Built for Learning and Culture.
         </p>
       </footer>
 

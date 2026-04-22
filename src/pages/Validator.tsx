@@ -142,7 +142,7 @@ export default function Validator({ user }: { user: any }) {
       parts.push({ text: prompt });
 
       const response = await ai.models.generateContent({
-        model: "gemini-3.1-pro-preview",
+        model: "gemini-3-flash-preview",
         contents: { parts },
         config: {
           responseMimeType: "application/json",

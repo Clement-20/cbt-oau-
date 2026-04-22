@@ -7,7 +7,11 @@ export interface Question {
 }
 
 export interface Course {
-  code: string; title: string; description: string; questions: Question[];
+  code: string; 
+  title: string; 
+  description: string; 
+  questions: Question[];
+  category?: string;
 }
 
 export const courses: Course[] = [

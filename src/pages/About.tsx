@@ -87,16 +87,11 @@ export default function About() {
         </p>
       </div>
 
-      <footer className="text-center py-8 border-t border-[var(--border)] space-y-4">
-        <p className="text-[var(--foreground)]/60 font-medium">
-          Copyright ©️ Clement IfeOluwa ❄️🧊 {new Date().getFullYear()}
-        </p>
-        <div className="flex justify-center gap-6">
-          <button className="text-[var(--foreground)]/40 hover:text-blue-500 transition-colors"><Twitter size={20} /></button>
-          <button className="text-[var(--foreground)]/40 hover:text-blue-500 transition-colors"><Github size={20} /></button>
-          <button className="text-[var(--foreground)]/40 hover:text-blue-500 transition-colors"><Globe size={20} /></button>
-        </div>
-      </footer>
+      <div className="flex justify-center gap-6 opacity-40 hover:opacity-100 transition-opacity pb-8">
+        <button className="text-[var(--foreground)]/40 hover:text-blue-500 transition-colors"><Twitter size={20} /></button>
+        <button className="text-[var(--foreground)]/40 hover:text-blue-500 transition-colors"><Github size={20} /></button>
+        <button className="text-[var(--foreground)]/40 hover:text-blue-500 transition-colors"><Globe size={20} /></button>
+      </div>
     </div>
   );
 }

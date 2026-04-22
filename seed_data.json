@@ -1,0 +1,158 @@
+[
+  {
+    "code": "POST-UTME-GEN",
+    "title": "OAU General Studies & History",
+    "category": "Post-UTME",
+    "description": "Essential questions on OAU history, campus facts, and general stress patterns.",
+    "questions": [
+      {
+        "id": 1,
+        "question": "In what year was the University of Ife (now Obafemi Awolowo University) founded?",
+        "options": ["1960", "1961", "1962", "1963"],
+        "correctAnswer": 1,
+        "topic": "OAU History"
+      },
+      {
+        "id": 2,
+        "question": "The University of Ife was renamed Obafemi Awolowo University on which date?",
+        "options": ["May 12, 1987", "July 10, 1987", "August 2, 1987", "October 1, 1987"],
+        "correctAnswer": 1,
+        "topic": "OAU History"
+      },
+      {
+        "id": 3,
+        "question": "Which of these served as the first Vice-Chancellor of the University of Ife?",
+        "options": ["Prof. Hezekiah Oluwasanmi", "Prof. Oladele Ajose", "Prof. Anthony Fafunwa", "Prof. Wole Soyinka"],
+        "correctAnswer": 1,
+        "topic": "OAU History"
+      },
+      {
+        "id": 4,
+        "question": "Obafemi Awolowo University is located in which ancient city?",
+        "options": ["Oyo", "Ibadan", "Ile-Ife", "Osogbo"],
+        "correctAnswer": 2,
+        "topic": "OAU Geography"
+      },
+      {
+        "id": 5,
+        "question": "Identify the word that has a different stress pattern: 'Education'",
+        "options": ["e-du-CA-tion", "E-du-ca-tion", "e-DU-ca-tion", "e-du-ca-TION"],
+        "correctAnswer": 0,
+        "topic": "English Stress"
+      },
+      {
+        "id": 6,
+        "question": "Which syllable carries the primary stress in the word 'PHOTOGRAPH'?",
+        "options": ["First", "Second", "Third", "None"],
+        "correctAnswer": 0,
+        "topic": "English Stress"
+      },
+      {
+        "id": 7,
+        "question": "Which syllable carries the primary stress in the word 'PHOTOGRAPHER'?",
+        "options": ["First", "Second", "Third", "Fourth"],
+        "correctAnswer": 1,
+        "topic": "English Stress"
+      },
+      {
+        "id": 8,
+        "question": "Who was the first Chancellor of the University of Ife?",
+        "options": ["Sir Adesoji Aderemi", "Chief Obafemi Awolowo", "Chief S.L. Akintola", "Dr. Nnamdi Azikiwe"],
+        "correctAnswer": 0,
+        "topic": "OAU History"
+      },
+      {
+        "id": 9,
+        "question": "The motto of Obafemi Awolowo University is ____",
+        "options": ["Service and Integrity", "For Learning and Culture", "Knowledge and Progress", "Wisdom and Excellence"],
+        "correctAnswer": 1,
+        "topic": "OAU Facts"
+      },
+      {
+        "id": 10,
+        "question": "Choose the word that has the same stress pattern as 'RELIABLE'",
+        "options": ["INTERESTING", "CONSIDERATE", "IMPORTANCE", "ADMIRABLE"],
+        "correctAnswer": 1,
+        "topic": "English Stress"
+      }
+    ]
+  },
+  {
+    "code": "GST 111",
+    "title": "Use of English I",
+    "category": "GST",
+    "description": "Official communication and academic English patterns for OAU 100 level students.",
+    "questions": [
+      {
+        "id": 1,
+        "question": "Which of the following is correct regarding concord?",
+        "options": ["The boy along with his friends are coming", "The boy along with his friends is coming", "The boy along with his friend are coming", "The boys along with his friend is coming"],
+        "correctAnswer": 1,
+        "topic": "Concord"
+      },
+      {
+        "id": 2,
+        "question": "Choose the correct option: 'Either the students or the teacher ___ responsible.'",
+        "options": ["is", "are", "were", "been"],
+        "correctAnswer": 0,
+        "topic": "Concord"
+      },
+      {
+        "id": 3,
+        "question": "The plural form of 'Crisis' is ____",
+        "options": ["Crisises", "Crises", "Crisises's", "Crisise"],
+        "correctAnswer": 1,
+        "topic": "Nouns"
+      },
+      {
+        "id": 4,
+        "question": "Identify the type of sentence: 'Give me the book.'",
+        "options": ["Declarative", "Interrogative", "Imperative", "Exclamatory"],
+        "correctAnswer": 2,
+        "topic": "Sentence Types"
+      },
+      {
+        "id": 5,
+        "question": "A group of words with a subject and a verb that can stand alone is a/an ____",
+        "options": ["Dependent Clause", "Independent Clause", "Phrase", "Predicate"],
+        "correctAnswer": 1,
+        "topic": "Grammar"
+      },
+      {
+        "id": 6,
+        "question": "Choose the correct spelling:",
+        "options": ["Accomodation", "Accommodation", "Acommodation", "Acomodation"],
+        "correctAnswer": 1,
+        "topic": "Spelling"
+      },
+      {
+        "id": 7,
+        "question": "'The panel ___ submitted its report.'",
+        "options": ["have", "has", "were", "having"],
+        "correctAnswer": 1,
+        "topic": "Concord"
+      },
+      {
+        "id": 8,
+        "question": "Which of these is a synonym for 'Meticulous'?",
+        "options": ["Lazy", "Careful", "Messy", "Quick"],
+        "correctAnswer": 1,
+        "topic": "Vocabulary"
+      },
+      {
+        "id": 9,
+        "question": "Identify the figure of speech: 'The wind whispered through the trees.'",
+        "options": ["Metaphor", "Simile", "Personification", "Hyperbole"],
+        "correctAnswer": 2,
+        "topic": "Figures of Speech"
+      },
+      {
+        "id": 10,
+        "question": "Choose the correct option: 'If I ___ a bird, I would fly.'",
+        "options": ["was", "am", "were", "be"],
+        "correctAnswer": 2,
+        "topic": "Subjunctive"
+      }
+    ]
+  }
+]

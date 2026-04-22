@@ -27,7 +27,7 @@ interface HostedTest {
   duration?: number;
 }
 
-export default function CBT({ user, isFocusMode, setIsFocusMode }: { user: any, isFocusMode?: boolean, setIsFocusMode?: (val: boolean) => void }) {
+export default function CBT({ user, dbUser, isFocusMode, setIsFocusMode }: { user: any, dbUser?: any, isFocusMode?: boolean, setIsFocusMode?: (val: boolean) => void }) {
   const [selectedCourse, setSelectedCourse] = useState<string | null>(null);
   const [questions, setQuestions] = useState<Question[]>([]);
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
@@ -36,6 +36,17 @@ export default function CBT({ user, isFocusMode, setIsFocusMode }: { user: any, 
   const [selectedOption, setSelectedOption] = useState<number | null>(null);
   const [showResult, setShowResult] = useState(false);
   const [allCourses, setAllCourses] = useState<Course[]>(localCourses);
+  const [displayedCourses, setDisplayedCourses] = useState<Course[]>([]);
+  
+  // Guest Logic Filtering
+  useEffect(() => {
+    let filtered = allCourses;
+    if (dbUser?.role === 'guest') {
+      filtered = allCourses.filter(c => c.category === 'Post-UTME');
+    }
+    setDisplayedCourses(filtered);
+  }, [allCourses, dbUser]);
+
   const [startTime, setStartTime] = useState<number>(0);
   const [newlyAwardedShana, setNewlyAwardedShana] = useState(false);
   const [timeLeft, setTimeLeft] = useState<number | null>(null);
@@ -744,7 +755,7 @@ export default function CBT({ user, isFocusMode, setIsFocusMode }: { user: any, 
             {
               "@context": "https://schema.org",
               "@type": "ItemList",
-              "itemListElement": ${JSON.stringify(allCourses.map((course, index) => ({
+              "itemListElement": ${JSON.stringify(displayedCourses.map((course, index) => ({
                 "@type": "ListItem",
                 "position": index + 1,
                 "item": {
@@ -913,7 +924,7 @@ export default function CBT({ user, isFocusMode, setIsFocusMode }: { user: any, 
             </div>
           ))
         ) : (
-          allCourses.filter(c => c.code.toLowerCase().includes(searchQuery.toLowerCase()) || c.title.toLowerCase().includes(searchQuery.toLowerCase())).map((course, index) => (
+          displayedCourses.filter(c => c.code.toLowerCase().includes(searchQuery.toLowerCase()) || c.title.toLowerCase().includes(searchQuery.toLowerCase())).map((course, index) => (
             <div 
               key={course.code} 
               draggable
@@ -947,7 +958,7 @@ export default function CBT({ user, isFocusMode, setIsFocusMode }: { user: any, 
       {showHostModal && (
         <HostTestModal 
           user={user} 
-          courses={allCourses} 
+          courses={displayedCourses} 
           onClose={() => setShowHostModal(false)} 
         />
       )}

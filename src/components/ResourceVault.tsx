@@ -187,9 +187,9 @@ export default function ResourceMarketplace({ user, isAdmin }: { user?: any, isA
         // Cloudinary Direct Upload
         const formData = new FormData();
         formData.append("file", selectedFile);
-        formData.append("upload_preset", "nexus_unsigned"); 
+        formData.append("upload_preset", import.meta.env.NEXT_PUBLIC_CLOUDINARY_UPLOAD_PRESET || "nexus_unsigned"); 
         
-        const response = await fetch(`https://api.cloudinary.com/v1_1/digital-nexus/image/upload`, {
+        const response = await fetch(`https://api.cloudinary.com/v1_1/${import.meta.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME || 'digital-nexus'}/image/upload`, {
           method: "POST",
           body: formData
         });
@@ -202,8 +202,10 @@ export default function ResourceMarketplace({ user, isAdmin }: { user?: any, isA
         const data = await response.json();
         finalUrl = data.secure_url;
       } else if (newResource.type === "PDF" && selectedFile) {
-        // Firebase Storage Upload with Progress
-        const storageRef = ref(storage, `resources/${user.uid}_${Date.now()}_${selectedFile.name}`);
+        // Optimized Firebase Storage Upload
+        const storageRef = ref(storage, `resources/${user.uid}_${Date.now()}_${selectedFile.name.replace(/\s+/g, '_')}`);
+        
+        // Start upload task
         const uploadTask = uploadBytesResumable(storageRef, selectedFile);
 
         finalUrl = await new Promise((resolve, reject) => {
@@ -211,20 +213,10 @@ export default function ResourceMarketplace({ user, isAdmin }: { user?: any, isA
             (snapshot) => {
               const progress = (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
               setUploadProgress(progress);
-              console.log('Upload is ' + progress + '% done');
             }, 
             (error) => {
               console.error("Firebase Storage Upload Error:", error);
-              console.error("Error Code:", error.code);
-              console.error("Error Message:", error.message);
-              
-              if (error.code === 'storage/unauthorized') {
-                toast("Permission denied: Check Firebase Storage rules");
-              } else if (error.code === 'storage/canceled') {
-                toast("Upload canceled");
-              } else {
-                toast(`Upload failed: ${error.message}`);
-              }
+              toast(`Upload failed: ${error.message}`);
               reject(error);
             }, 
             async () => {
@@ -237,9 +229,6 @@ export default function ResourceMarketplace({ user, isAdmin }: { user?: any, isA
         finalUrl = newResource.url;
       }
 
-      const userDoc = await getDoc(doc(db, "users", user.uid));
-      const uploaderVerified = userDoc.exists() ? userDoc.data().isVerified : false;
-
       await addDoc(collection(db, "resources"), {
         title: newResource.title,
         type: newResource.type,
@@ -247,7 +236,7 @@ export default function ResourceMarketplace({ user, isAdmin }: { user?: any, isA
         course: newResource.course.toUpperCase(),
         uploadedBy: user.displayName || "Anonymous",
         userId: user.uid,
-        uploaderVerified,
+        uploaderVerified: isVerifiedUser, // Use cached state
         likes: 0,
         dislikes: 0,
         timestamp: serverTimestamp()
@@ -256,11 +245,11 @@ export default function ResourceMarketplace({ user, isAdmin }: { user?: any, isA
       setNewResource({ title: "", type: "PDF", url: "", course: "" });
       setSelectedFile(null);
       setShowUpload(false);
-      toast("Resource added to the marketplace! 🚀");
+      toast("Resource published! 🚀");
       fetchResources(true);
     } catch (error) {
       handleFirestoreError(error, OperationType.CREATE, "resources");
-      toast("Failed to upload resource");
+      toast("Upload failed. Try again.");
     } finally {
       setIsUploading(false);
     }
