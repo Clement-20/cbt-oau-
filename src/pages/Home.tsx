@@ -199,21 +199,21 @@ export default function Home({ user, login, isLoggingIn }: { user: any, login?: 
 
       {/* Hero Section */}
       <div className="grid md:grid-cols-2 gap-6">
-        <div className="glass-panel p-6 md:p-8 rounded-3xl flex flex-col justify-between relative overflow-hidden">
+        <div className="glass-panel p-5 md:p-8 rounded-3xl flex flex-col justify-between relative overflow-hidden">
           <div className="absolute top-0 right-0 p-4 opacity-5 dark:opacity-10 text-[var(--foreground)]">
             <BookOpen size={120} />
           </div>
           <div className="relative z-10">
-            <h1 className="text-4xl md:text-5xl font-bold tracking-tighter mb-2">
+            <h1 className="text-2xl md:text-5xl font-bold tracking-tighter mb-1">
               Digital Nexus
             </h1>
-            <p className="text-[var(--foreground)]/60 mb-8 font-medium">The OAU Campus OS. Practice, Validate, Dominate.</p>
+            <p className="text-xs md:text-base text-[var(--foreground)]/60 mb-6 font-medium">The OAU Campus OS. Practice, Validate, Dominate.</p>
             
             <button 
               onClick={() => window.dispatchEvent(new CustomEvent("open-share-modal"))}
-              className="flex items-center gap-2 bg-emerald-500 hover:bg-emerald-600 text-white px-6 py-3 rounded-2xl font-bold transition-all shadow-lg hover:scale-105 mb-8"
+              className="flex items-center gap-2 bg-emerald-500 hover:bg-emerald-600 text-white px-5 py-2.5 rounded-xl font-bold transition-all shadow-lg hover:scale-105 mb-6 text-sm"
             >
-              <Share2 size={20} /> Share Nexus
+              <Share2 size={18} /> Share Nexus
             </button>
           </div>
           
@@ -239,7 +239,7 @@ export default function Home({ user, login, isLoggingIn }: { user: any, login?: 
         </div>
 
         {/* Daily Spark */}
-        <div className="bg-gradient-to-br from-blue-600/10 to-purple-600/10 dark:from-blue-900/40 dark:to-purple-900/40 border border-[var(--border)] p-6 md:p-8 rounded-3xl flex flex-col justify-center relative overflow-hidden shadow-sm">
+        <div className="bg-gradient-to-br from-blue-600/10 to-purple-600/10 dark:from-blue-900/40 dark:to-purple-900/40 border border-[var(--border)] p-5 md:p-8 rounded-3xl flex flex-col justify-center relative overflow-hidden shadow-sm">
           <div className="flex items-center justify-between mb-6 relative z-10">
             <div className="flex items-center gap-2 text-sm font-bold text-blue-600 dark:text-blue-400 uppercase tracking-wider">
               <Zap size={16} /> The Daily Spark
@@ -250,13 +250,13 @@ export default function Home({ user, login, isLoggingIn }: { user: any, login?: 
               </button>
             )}
           </div>
-          <blockquote className="text-2xl md:text-3xl font-serif italic leading-tight mb-6 relative z-10 text-[var(--foreground)]">
+          <blockquote className="text-lg md:text-3xl font-serif italic leading-tight mb-4 relative z-10 text-[var(--foreground)]">
             "{motivation.content}"
           </blockquote>
-          <div className="text-[var(--foreground)]/60 font-medium relative z-10">— {motivation.author}</div>
+          <div className="text-[10px] md:text-sm text-[var(--foreground)]/60 font-medium relative z-10">— {motivation.author}</div>
           <button 
             onClick={refreshSpark}
-            className="mt-8 text-xs bg-black/5 dark:bg-white/10 hover:bg-black/10 dark:hover:bg-white/20 transition-colors w-fit px-4 py-2 rounded-full font-medium relative z-10"
+            className="mt-6 text-[10px] bg-black/5 dark:bg-white/10 hover:bg-black/10 dark:hover:bg-white/20 transition-colors w-fit px-3 py-1.5 rounded-lg font-medium relative z-10"
           >
             Refresh Spark
           </button>
@@ -300,7 +300,7 @@ export default function Home({ user, login, isLoggingIn }: { user: any, login?: 
 
       {/* SEO FAQ Section */}
       <div className="mt-12 space-y-8">
-        <h2 className="text-3xl font-black tracking-tighter text-center">Frequently Asked Questions</h2>
+        <h2 className="text-xl md:text-3xl font-black tracking-tighter text-center">Frequently Asked Questions</h2>
         <div className="grid md:grid-cols-2 gap-6">
           <div className="glass-panel p-6 rounded-3xl border border-[var(--border)]">
             <h3 className="font-bold text-lg mb-2">What is Digital Nexus by ICEPAB?</h3>

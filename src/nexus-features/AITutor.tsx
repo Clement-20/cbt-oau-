@@ -72,7 +72,7 @@ Our database confirms this is the verified correct option for this question. Stu
               initial={{ opacity: 0, y: 20, scale: 0.9 }}
               animate={{ opacity: 1, y: 0, scale: 1 }}
               exit={{ opacity: 0, y: 20, scale: 0.9 }}
-              className="w-[320px] md:w-[400px] glass-panel p-6 rounded-3xl border-2 border-blue-500/30 shadow-2xl mb-4 overflow-hidden relative"
+              className="w-[calc(100vw-3rem)] max-w-sm md:max-w-md glass-panel p-6 rounded-3xl border-2 border-blue-500/30 shadow-2xl mb-4 overflow-hidden relative"
             >
               <div className="flex justify-between items-center mb-4">
                 <div className="flex items-center gap-2">

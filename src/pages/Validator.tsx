@@ -348,20 +348,20 @@ export default function Validator({ user }: { user: any }) {
         <meta name="description" content="Upload materials, let AI parse them, and crowdsource verification on the ICEPAB Nexus Validator." />
       </Helmet>
       <div>
-        <h1 className="text-3xl font-bold tracking-tighter flex items-center gap-3">
+        <h1 className="text-xl md:text-3xl font-bold tracking-tighter flex items-center gap-3">
           <ShieldCheck className="text-emerald-600 dark:text-emerald-500" /> Submit & Validate Questions
         </h1>
-        <p className="text-[var(--foreground)]/60 mt-2 font-medium">Submit questions manually. They need 20 user validations to join the question bank.</p>
+        <p className="text-sm md:text-base text-[var(--foreground)]/60 mt-2 font-medium">Submit questions manually. They need 20 user validations to join the question bank.</p>
       </div>
 
       <div className="grid lg:grid-cols-2 gap-8">
         {/* Upload Section */}
-        <div className="glass-panel p-8 rounded-3xl shadow-sm space-y-6 h-fit">
-          <div className="flex items-center justify-between">
-            <h2 className="text-2xl font-bold flex items-center gap-2">
-              <Upload size={24} className="text-emerald-600 dark:text-emerald-500" /> Add New Question
+        <div className="glass-panel p-5 md:p-8 rounded-3xl shadow-sm space-y-6 h-fit">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <h2 className="text-lg md:text-2xl font-bold flex items-center gap-2">
+              <Upload size={20} className="text-emerald-600 dark:text-emerald-500" /> Add New Question
             </h2>
-            <div className="flex bg-black/5 dark:bg-white/5 p-1 rounded-xl">
+            <div className="flex bg-black/5 dark:bg-white/5 p-1 rounded-xl w-fit">
               <button 
                 onClick={() => setUploadMode("manual")}
                 className={`px-4 py-1.5 rounded-lg text-xs font-bold transition-all ${uploadMode === "manual" ? 'bg-emerald-600 text-white shadow-md' : 'text-[var(--foreground)]/60 hover:text-[var(--foreground)]'}`}
@@ -385,25 +385,25 @@ export default function Validator({ user }: { user: any }) {
           
           <div className="space-y-5">
             <div>
-              <label className="block text-sm font-bold text-[var(--foreground)]/80 mb-2">Course Code (e.g., GST101)</label>
+              <label className="block text-[10px] font-bold text-[var(--foreground)]/50 uppercase tracking-widest mb-1.5">Course Code (e.g., GST101)</label>
               <input
                 type="text"
                 placeholder="GST101"
                 value={courseCode}
                 onChange={(e) => setCourseCode(e.target.value)}
-                className="w-full bg-black/5 dark:bg-black/50 border border-[var(--border)] rounded-2xl p-4 text-[var(--foreground)] placeholder:text-[var(--foreground)]/30 focus:outline-none focus:ring-2 focus:ring-emerald-500 uppercase font-medium transition-all"
+                className="w-full bg-black/5 dark:bg-black/50 border border-[var(--border)] rounded-xl p-3 text-[var(--foreground)] placeholder:text-[var(--foreground)]/30 focus:outline-none focus:ring-2 focus:ring-emerald-500 uppercase font-medium transition-all text-sm"
               />
             </div>
 
             {uploadMode === "manual" ? (
               <div className="space-y-4">
                 <div>
-                  <label className="block text-sm font-bold text-[var(--foreground)]/80 mb-2">Question</label>
+                  <label className="block text-[10px] font-bold text-[var(--foreground)]/50 uppercase tracking-widest mb-1.5">Question</label>
                   <textarea
                     placeholder="Enter the question text here..."
                     value={manualQuestion}
                     onChange={(e) => setManualQuestion(e.target.value)}
-                    className="w-full bg-black/5 dark:bg-black/50 border border-[var(--border)] rounded-2xl p-4 text-[var(--foreground)] placeholder:text-[var(--foreground)]/30 focus:outline-none focus:ring-2 focus:ring-emerald-500 h-24 font-medium transition-all resize-none"
+                    className="w-full bg-black/5 dark:bg-black/50 border border-[var(--border)] rounded-xl p-3 text-[var(--foreground)] placeholder:text-[var(--foreground)]/30 focus:outline-none focus:ring-2 focus:ring-emerald-500 h-24 font-medium transition-all resize-none text-sm"
                   />
                 </div>
 
@@ -445,9 +445,9 @@ export default function Validator({ user }: { user: any }) {
                 <button
                   onClick={handleManualSubmit}
                   disabled={isProcessing || !courseCode || !manualQuestion || manualOptions.some(o => !o) || correctOption === null}
-                  className="w-full flex items-center justify-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white px-6 py-4 rounded-2xl font-bold transition-all shadow-md disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="w-full flex items-center justify-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white px-5 py-3 rounded-xl font-bold transition-all shadow-md disabled:opacity-50 disabled:cursor-not-allowed text-sm"
                 >
-                  {isProcessing ? <><Loader2 className="animate-spin" size={20} /> Submitting...</> : <><Plus size={20} /> Submit Question</>}
+                  {isProcessing ? <><Loader2 className="animate-spin" size={18} /> Submitting...</> : <><Plus size={18} /> Submit Question</>}
                 </button>
               </div>
             ) : uploadMode === "file" ? (
@@ -495,8 +495,8 @@ export default function Validator({ user }: { user: any }) {
 
         {/* Validation Queue */}
         <div className="space-y-4">
-          <h2 className="text-2xl font-bold flex items-center gap-2">
-            <FileText size={24} className="text-emerald-600 dark:text-emerald-500" /> Validation Queue
+          <h2 className="text-xl md:text-2xl font-bold flex items-center gap-2">
+            <FileText size={20} className="text-emerald-600 dark:text-emerald-500" /> Validation Queue
           </h2>
           
           {isLoadingQuestions ? (
@@ -547,7 +547,7 @@ export default function Validator({ user }: { user: any }) {
                       <span className="text-xs font-mono font-bold text-red-500 bg-red-500/5 px-3 py-1 rounded-full">Rejects: {q.rejects || 0}/10</span>
                     </div>
                   </div>
-                  <p className="font-semibold text-lg leading-snug">{q.question}</p>
+                  <p className="font-semibold text-base md:text-lg leading-snug">{q.question}</p>
                   <div className="grid grid-cols-2 gap-3 text-sm font-medium">
                     {q.options.map((opt: string, idx: number) => (
                       <div key={idx} className={`p-3 rounded-xl border transition-colors ${idx === q.correctAnswer ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-700 dark:text-emerald-300' : 'bg-black/5 dark:bg-black/30 border-[var(--border)] text-[var(--foreground)]/70'}`}>
@@ -559,14 +559,14 @@ export default function Validator({ user }: { user: any }) {
                     <button 
                       onClick={() => voteQuestion(q, true)} 
                       disabled={q.voters?.includes(user?.uid)}
-                      className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-xl font-bold transition-colors ${q.voters?.includes(user?.uid) ? 'bg-black/5 dark:bg-white/5 text-[var(--foreground)]/30 cursor-not-allowed' : 'bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-700 dark:text-emerald-400'}`}
+                      className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-xl font-bold transition-colors text-sm ${q.voters?.includes(user?.uid) ? 'bg-black/5 dark:bg-white/5 text-[var(--foreground)]/30 cursor-not-allowed' : 'bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-700 dark:text-emerald-400'}`}
                     >
                       <Check size={18} /> Legit
                     </button>
                     <button 
                       onClick={() => voteQuestion(q, false)} 
                       disabled={q.voters?.includes(user?.uid)}
-                      className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-xl font-bold transition-colors ${q.voters?.includes(user?.uid) ? 'bg-black/5 dark:bg-white/5 text-[var(--foreground)]/30 cursor-not-allowed' : 'bg-red-500/10 hover:bg-red-500/20 text-red-700 dark:text-red-400'}`}
+                      className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-xl font-bold transition-colors text-sm ${q.voters?.includes(user?.uid) ? 'bg-black/5 dark:bg-white/5 text-[var(--foreground)]/30 cursor-not-allowed' : 'bg-red-500/10 hover:bg-red-500/20 text-red-700 dark:text-red-400'}`}
                     >
                       <X size={18} /> Flawed
                     </button>

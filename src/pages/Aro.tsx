@@ -120,7 +120,7 @@ export default function Aro({ user }: { user: any }) {
           {/* The Beautiful Card to Download */}
           <div 
             ref={cardRef}
-            className="relative aspect-[9/16] w-full max-w-[350px] rounded-[2rem] overflow-hidden shadow-2xl flex flex-col justify-center p-8 text-center border-4 border-purple-500/30"
+            className="relative aspect-[9/16] w-full max-w-sm rounded-[2rem] overflow-hidden shadow-2xl flex flex-col justify-center p-8 text-center border-4 border-purple-500/30"
             style={{
               background: "linear-gradient(135deg, #020617 0%, #1e1b4b 100%)",
             }}
@@ -150,7 +150,7 @@ export default function Aro({ user }: { user: any }) {
             </div>
           </div>
 
-          <div className="flex gap-4 w-full max-w-[350px]">
+          <div className="flex gap-4 w-full max-w-sm">
             <button
               onClick={handleDownload}
               disabled={downloading}

@@ -30,7 +30,7 @@ export default function OfflineBanner() {
         initial={{ y: -100, opacity: 0 }}
         animate={{ y: 0, opacity: 1 }}
         exit={{ y: -100, opacity: 0 }}
-        className="fixed top-20 left-1/2 -translate-x-1/2 z-[60] w-[90%] max-w-md"
+        className="fixed top-20 left-1/2 -translate-x-1/2 z-[60] w-[calc(100vw-2rem)] max-w-md"
       >
         <div className="bg-amber-500/90 backdrop-blur-md text-white p-4 rounded-2xl shadow-2xl border border-amber-400/50 flex items-center gap-4">
           <div className="bg-white/20 p-2 rounded-xl">

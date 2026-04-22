@@ -190,24 +190,24 @@ export default function CGPACalculator() {
         <motion.div 
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
-          className="glass-panel p-6 rounded-3xl border-cyan-500/20 text-center"
+          className="glass-panel p-4 md:p-6 rounded-3xl border-cyan-500/20 text-center"
         >
-          <p className="text-xs font-bold text-cyan-500 uppercase tracking-widest mb-1">Current GPA</p>
-          <h2 className="text-4xl font-black tracking-tighter">{currentGPA}</h2>
+          <p className="text-[10px] md:text-xs font-bold text-cyan-500 uppercase tracking-widest mb-1">Current GPA</p>
+          <h2 className="text-2xl md:text-4xl font-black tracking-tighter">{currentGPA}</h2>
         </motion.div>
         <motion.div 
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.1 }}
-          className="glass-panel p-6 rounded-3xl border-purple-500/20 text-center"
+          className="glass-panel p-4 md:p-6 rounded-3xl border-purple-500/20 text-center"
         >
-          <p className="text-xs font-bold text-purple-500 uppercase tracking-widest mb-1">Current CGPA</p>
-          <h2 className="text-4xl font-black tracking-tighter">{currentCGPA}</h2>
+          <p className="text-[10px] md:text-xs font-bold text-purple-500 uppercase tracking-widest mb-1">Current CGPA</p>
+          <h2 className="text-2xl md:text-4xl font-black tracking-tighter">{currentCGPA}</h2>
         </motion.div>
       </div>
 
       {/* Semester ID and Previous Records */}
-      <div className="glass-panel p-6 rounded-3xl space-y-4">
+      <div className="glass-panel p-5 md:p-6 rounded-3xl space-y-4">
         <div className="flex items-center gap-2 mb-2">
           <BookOpen className="text-cyan-500" size={20} />
           <h3 className="font-bold">Semester Info & Records</h3>
@@ -249,7 +249,7 @@ export default function CGPACalculator() {
       </div>
 
       {/* Target Mode Toggle */}
-      <div className="glass-panel p-6 rounded-3xl border-amber-500/20">
+      <div className="glass-panel p-5 md:p-6 rounded-3xl border-amber-500/20">
         <div className="flex justify-between items-center mb-4">
           <div className="flex items-center gap-2">
             <Target className="text-amber-500" size={20} />
@@ -384,20 +384,20 @@ export default function CGPACalculator() {
       </div>
 
       {/* Actions */}
-      <div className="fixed bottom-6 left-1/2 -translate-x-1/2 w-full max-w-md px-4 flex gap-3">
+      <div className="fixed bottom-6 left-1/2 -translate-x-1/2 w-full max-w-sm px-4 flex gap-3 z-40">
         <button 
           onClick={syncToCloud}
           disabled={isSyncing}
-          className="flex-1 bg-zinc-900 dark:bg-white text-white dark:text-zinc-900 py-4 rounded-2xl font-bold flex items-center justify-center gap-2 shadow-xl hover:scale-105 transition-all"
+          className="flex-1 bg-zinc-900 dark:bg-white text-white dark:text-zinc-900 py-3.5 rounded-xl font-bold flex items-center justify-center gap-2 shadow-xl hover:scale-105 transition-all text-sm"
         >
-          {isSyncing ? <RefreshCw className="animate-spin" size={20} /> : <Save size={20} />}
+          {isSyncing ? <RefreshCw className="animate-spin" size={18} /> : <Save size={18} />}
           Sync to Cloud
         </button>
         <button 
           onClick={() => addCourse(2)}
-          className="w-16 h-16 bg-cyan-500 text-white rounded-2xl flex items-center justify-center shadow-xl shadow-cyan-500/20 hover:scale-110 transition-all"
+          className="w-14 h-14 bg-cyan-500 text-white rounded-xl flex items-center justify-center shadow-xl shadow-cyan-500/20 hover:scale-110 transition-all"
         >
-          <Plus size={32} />
+          <Plus size={28} />
         </button>
       </div>
     </div>

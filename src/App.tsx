@@ -329,7 +329,7 @@ function MainApp() {
   ];
 
   return (
-    <div className="min-h-screen bg-[var(--background)] text-[var(--foreground)] font-sans transition-colors duration-300">
+    <div className="min-h-screen bg-[var(--background)] text-[var(--foreground)] font-sans transition-colors duration-300 overflow-x-hidden">
       <Helmet>
         <title>Digital Nexus | OAU CBT Practice & CGPA Calculator</title>
         <meta name="keywords" content="OAU CBT, GST 111 OAU, OAU CGPA Calculator, Obafemi Awolowo University, Great Ife, OAU e-portal, Digital Nexus, ICEPAB, Clement IfeOluwa, OAU Past Questions, OAU Post-UTME, OAU Freshers Guide" />
