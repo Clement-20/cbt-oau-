@@ -29,6 +29,18 @@ export const PaymentService = {
   },
 
   /**
+   * Initializes the native Paystack popup.
+   */
+  handlePayment(config: any) {
+    const handler = (window as any).PaystackPop.setup({
+      ...config,
+      callback: (response: any) => config.onSuccess(response),
+      onClose: () => config.onClose(),
+    });
+    handler.openIframe();
+  },
+
+  /**
    * Configuration for Paystack integration
    */
   getPaystackConfig(email: string, amount: number, onSuccess: (reference: any) => void, onClose: () => void) {
@@ -43,7 +55,6 @@ export const PaymentService = {
       email,
       amount: amount * 100, // Paystack expects amount in Kobo
       publicKey,
-      text: "Verify Account",
       onSuccess,
       onClose,
     };

@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from "react";
 import { Helmet } from "react-helmet-async";
-import { usePaystackPayment } from "react-paystack";
 import { toast } from "../components/Toast";
 import { Loader2, CreditCard, ShieldCheck } from "lucide-react";
 import { getSettings } from "../lib/settings";
@@ -34,7 +33,9 @@ export default function Verification({ user }: { user: any }) {
     }
   );
 
-  const initializePayment = usePaystackPayment(config);
+  const startPayment = () => {
+    PaymentService.handlePayment(config);
+  };
 
   if (loading) {
     return (
@@ -60,10 +61,7 @@ export default function Verification({ user }: { user: any }) {
         
         <div className="space-y-4 pt-4">
           <button
-            onClick={() => {
-              // @ts-ignore - initializePayment type can be tricky with different package versions
-              initializePayment();
-            }}
+            onClick={startPayment}
             disabled={isSubmitting || !isPaymentEnabled}
             className="w-full bg-blue-600 hover:bg-blue-700 text-white py-4 rounded-2xl font-bold transition-all shadow-lg shadow-blue-500/20 flex items-center justify-center gap-2 group"
           >
