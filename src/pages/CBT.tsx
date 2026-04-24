@@ -579,6 +579,7 @@ export default function CBT({ user, dbUser, isFocusMode, setIsFocusMode }: { use
                   correctAnswer={questions[reviewIndex].options[questions[reviewIndex].correctAnswer]}
                   isVerified={isVerified}
                   isVisible={true}
+                  autoExplain={userAnswers[reviewIndex] !== questions[reviewIndex].correctAnswer}
                 />
               </div>
             </div>

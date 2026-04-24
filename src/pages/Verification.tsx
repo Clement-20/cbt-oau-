@@ -1,3 +1,9 @@
+declare global {
+  interface Window {
+    PaystackPop: any;
+  }
+}
+
 import React, { useState, useEffect } from "react";
 import { Helmet } from "react-helmet-async";
 import { toast } from "../components/Toast";
@@ -34,7 +40,12 @@ export default function Verification({ user }: { user: any }) {
   );
 
   const startPayment = () => {
-    PaymentService.handlePayment(config);
+    if (window.PaystackPop) {
+      PaymentService.handlePayment(config);
+    } else {
+      alert("Payment system loading, please try again in a moment");
+      console.error("Paystack SDK not loaded.");
+    }
   };
 
   if (loading) {

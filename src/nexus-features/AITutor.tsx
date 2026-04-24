@@ -10,9 +10,10 @@ interface AITutorProps {
   correctAnswer: string;
   isVerified: boolean;
   isVisible: boolean;
+  autoExplain?: boolean;
 }
 
-export default function AITutor({ question, options, correctAnswer, isVerified, isVisible }: AITutorProps) {
+export default function AITutor({ question, options, correctAnswer, isVerified, isVisible, autoExplain }: AITutorProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [explanation, setExplanation] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
@@ -49,6 +50,13 @@ Our database confirms this is the verified correct option for this question. Stu
       setIsLoading(false);
     }, 800);
   };
+
+  // Auto-trigger explanation
+  useEffect(() => {
+    if (autoExplain && !explanation && !isLoading) {
+      handleExplain();
+    }
+  }, [autoExplain, explanation, isLoading]);
 
   // Reset explanation when question changes
   useEffect(() => {

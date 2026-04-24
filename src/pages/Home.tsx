@@ -302,26 +302,41 @@ export default function Home({ user, login, isLoggingIn }: { user: any, login?: 
       <div className="mt-12 space-y-8">
         <h2 className="text-xl md:text-3xl font-black tracking-tighter text-center">Frequently Asked Questions</h2>
         <div className="grid md:grid-cols-2 gap-6">
-          <div className="glass-panel p-6 rounded-3xl border border-[var(--border)]">
-            <h3 className="font-bold text-lg mb-2">What is Digital Nexus by ICEPAB?</h3>
-            <p className="text-sm text-[var(--foreground)]/60 leading-relaxed font-menu">
-              Digital Nexus is the premier academic companion for OAU students. It provides a state-of-the-art CBT Engine, direct OAU ePortal access, CGPA calculation, and verified OAU study resources, curated by Clement IfeOluwa and the ICEPAB team.
-            </p>
-          </div>
-          <div className="glass-panel p-6 rounded-3xl border border-[var(--border)]">
-            <h3 className="font-bold text-lg mb-2">How does the OAU CBT Engine work?</h3>
-            <p className="text-sm text-[var(--foreground)]/60 leading-relaxed font-menu">
-              Our CBT Engine simulates the official OAU examination environment. Students can practice past questions for ALL courses with real-time analytics and performance tracking to ensure exam success.
-            </p>
-          </div>
-          <div className="glass-panel p-6 rounded-3xl border border-[var(--border)] text-center md:col-span-2">
-            <h3 className="font-bold text-lg mb-2 italic underline decoration-blue-500">Official OAU ePortal Affiliation</h3>
-            <p className="text-sm text-[var(--foreground)]/60 leading-relaxed font-menu max-w-2xl mx-auto">
-              Digital Nexus provides the fastest gateway to the <b>OAU Student Portal (ePortal)</b>. We monitor the portal status 24/7 to help Great Ife students stay updated on registration, fees, and results without the frustration of downtime.
-            </p>
-          </div>
+          <Accordion 
+            question="What is Digital Nexus by ICEPAB?" 
+            answer="Digital Nexus is the premier academic companion for OAU students. It provides a state-of-the-art CBT Engine, direct OAU ePortal access, CGPA calculation, and verified OAU study resources, curated by Clement IfeOluwa and the ICEPAB team."
+          />
+          <Accordion 
+            question="How does the OAU CBT Engine work?" 
+            answer="Our CBT Engine simulates the official OAU examination environment. Students can practice past questions for ALL courses with real-time analytics and performance tracking to ensure exam success."
+          />
+          <Accordion 
+            question="Official OAU ePortal Affiliation" 
+            answer="Digital Nexus provides the fastest gateway to the OAU Student Portal (ePortal). We monitor the portal status 24/7 to help Great Ife students stay updated on registration, fees, and results without the frustration of downtime."
+            className="md:col-span-2"
+          />
         </div>
       </div>
     </motion.div>
+  );
+}
+
+function Accordion({ question, answer, className = "" }: { question: string; answer: string, className?: string }) {
+  const [isOpen, setIsOpen] = useState(false);
+  return (
+    <div className={`glass-panel p-6 rounded-3xl border border-[var(--border)] ${className}`}>
+      <button 
+        onClick={() => setIsOpen(!isOpen)}
+        className="w-full flex justify-between items-center font-bold text-lg mb-2"
+      >
+        {question}
+        <span className="text-blue-500">{isOpen ? "-" : "+"}</span>
+      </button>
+      {isOpen && (
+        <p className="text-sm text-[var(--foreground)]/60 leading-relaxed font-menu animate-in slide-in-from-top-2 duration-200">
+          {answer}
+        </p>
+      )}
+    </div>
   );
 }

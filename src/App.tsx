@@ -29,8 +29,10 @@ const Community = lazy(() => import("./pages/Community"));
 const Verification = lazy(() => import("./pages/Verification"));
 const Resources = lazy(() => import("./pages/Resources"));
 const AdminDashboard = lazy(() => import("./pages/AdminDashboard"));
+const NotFound = lazy(() => import("./pages/NotFound"));
 const StudyMode = lazy(() => import("./pages/StudyMode"));
 const AdminSeeder = lazy(() => import("./pages/AdminSeeder"));
+const ForgotPassword = lazy(() => import("./pages/ForgotPassword"));
 
 import { ErrorBoundary } from "./components/ErrorBoundary";
 import LoadingLogo from "./components/LoadingLogo";
@@ -517,6 +519,8 @@ function MainApp() {
             <Route path="/verification" element={<Verification user={user} />} />
             <Route path="/resources" element={<Resources user={user} />} />
             <Route path="/study-mode" element={<StudyMode user={user} />} />
+            <Route path="/forgot-password" element={<ForgotPassword />} />
+            <Route path="*" element={<NotFound />} />
           </Routes>
         </Suspense>
       </main>
