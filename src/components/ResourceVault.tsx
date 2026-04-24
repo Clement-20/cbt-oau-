@@ -234,7 +234,8 @@ export default function ResourceMarketplace({ user, isAdmin }: { user?: any, isA
         uploaderVerified: isVerifiedUser,
         likes: 0,
         dislikes: 0,
-        validated: false,
+        validated: isVerifiedUser,
+        qualityScore: (0 - 0) + (isVerifiedUser ? 10 : 0),
         timestamp: serverTimestamp()
       });
       

@@ -57,6 +57,13 @@ service cloud.firestore {
     // ===============================================================
     // Collections
     // ===============================================================
+    match /notifications/{notificationId} {
+      allow read: if isAuthenticated() && request.auth.uid == resource.data.userId;
+      allow create: if isAuthenticated() && request.resource.data.userId == request.auth.uid;
+      allow update: if isAuthenticated() && request.auth.uid == resource.data.userId && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['read']);
+      allow delete: if isAuthenticated() && request.auth.uid == resource.data.userId;
+    }
+
     match /settings/{settingId} {
       allow read: if true;
       allow write: if isAdmin();
@@ -150,11 +157,11 @@ service cloud.firestore {
 
     match /resources/{resourceId} {
       allow read: if isAuthenticated() || isAdmin();
-      allow create: if (isVerified() || isAdmin()) && hasRequiredFields(['userId', 'url', 'title', 'type', 'course']) && isValidUrl('url') && hasOnlyAllowedFields(['title', 'type', 'url', 'course', 'uploadedBy', 'userId', 'fileHash', 'timestamp', 'uploaderVerified', 'likes', 'dislikes']);
+      allow create: if (isAuthenticated()) && hasRequiredFields(['userId', 'url', 'title', 'type', 'course']) && isValidUrl('url') && request.resource.data.keys().hasAll(['title', 'type', 'url', 'course', 'uploadedBy', 'userId', 'timestamp', 'uploaderVerified', 'likes', 'dislikes', 'validated']);
       allow update: if isAuthenticated() && (
         isAdmin() || 
         request.auth.uid == resource.data.userId ||
-        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['likes', 'dislikes'])
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['likes', 'dislikes', 'qualityScore', 'validated'])
       );
       allow delete: if isAdmin() || (isAuthenticated() && request.auth.uid == resource.data.userId);
     }
