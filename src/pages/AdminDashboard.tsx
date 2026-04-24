@@ -1,13 +1,16 @@
 import React, { useState, useEffect } from "react";
 import { Helmet } from "react-helmet-async";
 import { getSettings, updateSettings } from "../lib/settings";
-import { ShieldCheck, ToggleLeft, ToggleRight, Loader2, AlertTriangle, Settings } from "lucide-react";
+import { ShieldCheck, ToggleLeft, ToggleRight, Loader2, AlertTriangle, Settings, Users, BarChart } from "lucide-react";
 import { toast } from "../components/Toast";
+import UserManagement from "../components/Admin/UserManagement";
+import AnalyticsDashboard from "../components/Admin/AnalyticsDashboard";
 
 export default function AdminDashboard({ user, dbUser }: { user: any, dbUser?: any }) {
   const [settings, setSettings] = useState<any>({});
   const [loading, setLoading] = useState(true);
   const [toggling, setToggling] = useState<string | null>(null);
+  const [activeTab, setActiveTab] = useState<"features" | "users" | "analytics">("features");
 
   const isAdmin = dbUser?.email === "banmekeifeoluwa@gmail.com";
 
@@ -46,6 +49,7 @@ export default function AdminDashboard({ user, dbUser }: { user: any, dbUser?: a
     { key: "isCBTEnabled", label: "CBT Engine" },
     { key: "isVaultEnabled", label: "Resources Vault" },
     { key: "isAITutorEnabled", label: "AI Tutor" },
+    { key: "canEveryoneUpload", label: "Public Resource Upload" },
   ];
 
   return (
@@ -59,31 +63,53 @@ export default function AdminDashboard({ user, dbUser }: { user: any, dbUser?: a
           <Settings className="text-blue-600" size={32} />
         </div>
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Feature Flags</h1>
-          <p className="text-[var(--foreground)]/50">Toggle system features globally.</p>
+          <h1 className="text-3xl font-bold tracking-tight">Admin Dashboard</h1>
+          <p className="text-[var(--foreground)]/50">Manage the system.</p>
         </div>
       </div>
 
-      <div className="glass-panel p-6 rounded-3xl space-y-4">
-        {features.map((feature) => (
-          <div key={feature.key} className="flex items-center justify-between p-4 bg-black/5 dark:bg-white/5 rounded-2xl border border-[var(--border)]">
-            <span className="font-bold">{feature.label}</span>
-            <button
-              onClick={() => toggleFeature(feature.key)}
-              disabled={toggling === feature.key}
-              className={`p-2 rounded-xl transition-all ${settings[feature.key] ? 'text-emerald-500' : 'text-[var(--foreground)]/30'}`}
-            >
-              {toggling === feature.key ? (
-                <Loader2 className="animate-spin" size={24} />
-              ) : settings[feature.key] ? (
-                <ToggleRight size={32} />
-              ) : (
-                <ToggleLeft size={32} />
-              )}
-            </button>
-          </div>
+      <div className="flex gap-2 mb-6">
+        {["features", "users", "analytics"].map((tab) => (
+          <button 
+            key={tab}
+            onClick={() => setActiveTab(tab as any)}
+            className={`px-4 py-2 rounded-xl text-sm font-bold ${activeTab === tab ? "bg-blue-600 text-white" : "bg-black/5 dark:bg-white/5"}`}
+          >
+            {tab.charAt(0).toUpperCase() + tab.slice(1)}
+          </button>
         ))}
       </div>
+
+      {activeTab === "features" && (
+        <div className="glass-panel p-6 rounded-3xl space-y-4">
+          {features.map((feature) => (
+            <div key={feature.key} className="flex items-center justify-between p-4 bg-black/5 dark:bg-white/5 rounded-2xl border border-[var(--border)]">
+              <span className="font-bold">{feature.label}</span>
+              <button
+                onClick={() => toggleFeature(feature.key)}
+                disabled={toggling === feature.key}
+                className={`p-2 rounded-xl transition-all ${settings[feature.key] ? 'text-emerald-500' : 'text-[var(--foreground)]/30'}`}
+              >
+                {toggling === feature.key ? (
+                  <Loader2 className="animate-spin" size={24} />
+                ) : settings[feature.key] ? (
+                  <ToggleRight size={32} />
+                ) : (
+                  <ToggleLeft size={32} />
+                )}
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+      
+      {activeTab === "users" && <UserManagement />}
+      
+      {activeTab === "analytics" && (
+        <div className="glass-panel p-6 rounded-3xl">
+          <AnalyticsDashboard />
+        </div>
+      )}
     </div>
   );
 }

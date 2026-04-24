@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useMemo } from "react";
-import { Upload, FileText, Download, Search, Trash2, X, Loader2, ThumbsUp, ThumbsDown, UserPlus, UserMinus, Filter, ChevronDown, BookOpen, Clock, Star, ExternalLink, Image as ImageIcon, File as FileIcon, User } from "lucide-react";
+import { Upload, FileText, Download, Search, Trash2, X, Loader2, ThumbsUp, ThumbsDown, UserPlus, UserMinus, Filter, ChevronDown, BookOpen, Clock, Star, ExternalLink, Image as ImageIcon, File as FileIcon, User, Share2 } from "lucide-react";
 import { collection, onSnapshot, query, orderBy, addDoc, serverTimestamp, deleteDoc, doc, getDocs, where, updateDoc, increment, limit, startAfter, getDoc, QueryDocumentSnapshot } from "firebase/firestore";
 import { ref, uploadBytesResumable, getDownloadURL } from "firebase/storage";
 import { db, storage, auth } from "../firebase";
@@ -8,18 +8,21 @@ import ConfirmModal from "./ConfirmModal";
 import { handleFirestoreError, OperationType } from "../utils/errorHandling";
 import { useAcademicStore } from "../lib/academicStore";
 import { motion, AnimatePresence } from "motion/react";
+import { subscribeToSettings } from "../lib/settings";
 
 import { FeedSkeleton } from "../nexus-features/SkeletonLoader";
 
 interface Resource {
   id: string;
   title: string;
-  type: "PDF" | "Image" | "Link";
+  type: "PDF" | "Image" | "Note";
   url: string;
   course: string;
+  category: string;
   uploadedBy: string;
   userId: string;
   uploaderVerified?: boolean;
+  validated?: boolean;
   likes: number;
   dislikes: number;
   fileHash?: string;
@@ -29,10 +32,15 @@ interface Resource {
 
 export default function ResourceMarketplace({ user, isAdmin }: { user?: any, isAdmin?: boolean }) {
   const [resources, setResources] = useState<Resource[]>([]);
+  const [settings, setSettings] = useState<any>({});
+  
+  useEffect(() => {
+    return subscribeToSettings((s) => setSettings(s));
+  }, []);
   const [search, setSearch] = useState("");
   const [showUpload, setShowUpload] = useState(false);
-  const [activeTab, setActiveTab] = useState<"feed" | "my-uploads" | "favorites">("feed");
-  const [newResource, setNewResource] = useState<{title: string, type: "PDF" | "Image" | "Link", url: string, course: string}>({ title: "", type: "PDF", url: "", course: "" });
+  const [activeTab, setActiveTab] = useState<"feed" | "my-uploads" | "favorites" | "admin-queue">("feed");
+  const [newResource, setNewResource] = useState<{title: string, type: "PDF" | "Image" | "Note", url: string, course: string, category: string}>({ title: "", type: "PDF", url: "", course: "", category: "Notes" });
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [isUploading, setIsUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
@@ -159,6 +167,17 @@ export default function ResourceMarketplace({ user, isAdmin }: { user?: any, isA
     }
   };
 
+  const validateResource = async (resourceId: string) => {
+    if (!isAdmin) return;
+    try {
+      await updateDoc(doc(db, "resources", resourceId), { validated: true });
+      toast("Resource validated! ✅");
+      fetchResources(true);
+    } catch (e) {
+      toast("Failed to validate resource");
+    }
+  };
+
   const handleUpload = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!user) {
@@ -173,8 +192,8 @@ export default function ResourceMarketplace({ user, isAdmin }: { user?: any, isA
       toast("Please fill all required fields");
       return;
     }
-    if ((newResource.type === "PDF" || newResource.type === "Image") && !selectedFile) {
-      toast(`Please select a ${newResource.type} file to upload`);
+    if (!selectedFile) {
+      toast(`Please select a file to upload`);
       return;
     }
 
@@ -183,66 +202,43 @@ export default function ResourceMarketplace({ user, isAdmin }: { user?: any, isA
     try {
       let finalUrl = "";
       
-      if (newResource.type === "Image" && selectedFile) {
-        // Cloudinary Direct Upload
-        const formData = new FormData();
-        formData.append("file", selectedFile);
-        formData.append("upload_preset", import.meta.env.NEXT_PUBLIC_CLOUDINARY_UPLOAD_PRESET || "nexus_unsigned"); 
-        
-        const response = await fetch(`https://api.cloudinary.com/v1_1/${import.meta.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME || 'digital-nexus'}/image/upload`, {
-          method: "POST",
-          body: formData
-        });
-        
-        if (!response.ok) {
-          const errorData = await response.json();
-          console.error("Cloudinary Error:", errorData);
-          throw new Error(`Cloudinary upload failed: ${errorData.error?.message || response.statusText}`);
-        }
-        const data = await response.json();
-        finalUrl = data.secure_url;
-      } else if (newResource.type === "PDF" && selectedFile) {
-        // Optimized Firebase Storage Upload
-        const storageRef = ref(storage, `resources/${user.uid}_${Date.now()}_${selectedFile.name.replace(/\s+/g, '_')}`);
-        
-        // Start upload task
-        const uploadTask = uploadBytesResumable(storageRef, selectedFile);
-
-        finalUrl = await new Promise((resolve, reject) => {
-          uploadTask.on('state_changed', 
-            (snapshot) => {
-              const progress = (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
-              setUploadProgress(progress);
-            }, 
-            (error) => {
-              console.error("Firebase Storage Upload Error:", error);
-              toast(`Upload failed: ${error.message}`);
-              reject(error);
-            }, 
-            async () => {
-              const downloadURL = await getDownloadURL(uploadTask.snapshot.ref);
-              resolve(downloadURL);
-            }
-          );
-        });
-      } else {
-        finalUrl = newResource.url;
-      }
+      const storageRef = ref(storage, `resources/${user.uid}_${Date.now()}_${selectedFile.name.replace(/\s+/g, '_')}`);
+      
+      const uploadTask = uploadBytesResumable(storageRef, selectedFile);
+      finalUrl = await new Promise((resolve, reject) => {
+        uploadTask.on('state_changed', 
+          (snapshot) => {
+            const progress = (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
+            setUploadProgress(progress);
+          }, 
+          (error) => {
+            console.error("Firebase Storage Upload Error:", error);
+            toast(`Upload failed: ${error.message}`);
+            reject(error);
+          }, 
+          async () => {
+            const downloadURL = await getDownloadURL(uploadTask.snapshot.ref);
+            resolve(downloadURL);
+          }
+        );
+      });
 
       await addDoc(collection(db, "resources"), {
         title: newResource.title,
         type: newResource.type,
+        category: newResource.category,
         url: finalUrl,
         course: newResource.course.toUpperCase(),
         uploadedBy: user.displayName || "Anonymous",
         userId: user.uid,
-        uploaderVerified: isVerifiedUser, // Use cached state
+        uploaderVerified: isVerifiedUser,
         likes: 0,
         dislikes: 0,
+        validated: false,
         timestamp: serverTimestamp()
       });
       
-      setNewResource({ title: "", type: "PDF", url: "", course: "" });
+      setNewResource({ title: "", type: "PDF", url: "", course: "", category: "Notes" });
       setSelectedFile(null);
       setShowUpload(false);
       toast("Resource published! 🚀");
@@ -255,38 +251,68 @@ export default function ResourceMarketplace({ user, isAdmin }: { user?: any, isA
     }
   };
 
-  const handleSocialAction = async (resourceId: string, action: "like" | "dislike") => {
+  const handleSocialAction = async (resource: Resource, action: "like" | "dislike") => {
     if (!user) return toast("Sign in to interact");
     
+    const resourceId = resource.id;
     const isLiked = likedResources.includes(resourceId);
     const isDisliked = dislikedResources.includes(resourceId);
 
     try {
       const docRef = doc(db, "resources", resourceId);
+      let likesChange = 0;
+      let dislikesChange = 0;
       
       if (action === "like") {
         if (isLiked) {
-          await updateDoc(docRef, { likes: increment(-1) });
+          likesChange = -1;
         } else {
-          await updateDoc(docRef, { 
-            likes: increment(1),
-            ...(isDisliked && { dislikes: increment(-1) })
-          });
+          likesChange = 1;
+          if (isDisliked) dislikesChange = -1;
         }
         toggleLike(resourceId);
       } else {
         if (isDisliked) {
-          await updateDoc(docRef, { dislikes: increment(-1) });
+          dislikesChange = -1;
         } else {
-          await updateDoc(docRef, { 
-            dislikes: increment(1),
-            ...(isLiked && { likes: increment(-1) })
-          });
+          dislikesChange = 1;
+          if (isLiked) likesChange = -1;
         }
         toggleDislike(resourceId);
       }
+
+      const newLikes = (resource.likes || 0) + likesChange;
+      const newDislikes = (resource.dislikes || 0) + dislikesChange;
+      const newQualityScore = newLikes - newDislikes + (resource.uploaderVerified ? 10 : 0);
+      
+      const updateData: any = { 
+        likes: increment(likesChange),
+        dislikes: increment(dislikesChange),
+        qualityScore: newQualityScore
+      };
+      
+      // Auto-validate if score >= 10
+      if (!resource.validated && newQualityScore >= 10) {
+        updateData.validated = true;
+        toast("Resource automatically validated! 🎉");
+      }
+
+      await updateDoc(docRef, updateData);
     } catch (error) {
       console.error("Social action failed", error);
+    }
+  };
+
+  const shareResource = (resource: Resource) => {
+    if (navigator.share) {
+      navigator.share({
+        title: resource.title,
+        text: `Check out this resource for ${resource.course}!`,
+        url: resource.url
+      }).catch(console.error);
+    } else {
+      navigator.clipboard.writeText(resource.url);
+      toast("Link copied to clipboard!");
     }
   };
 
@@ -296,30 +322,32 @@ export default function ResourceMarketplace({ user, isAdmin }: { user?: any, isA
       return (
         r.title.toLowerCase().includes(searchTerm) || 
         r.course.toLowerCase().includes(searchTerm) ||
-        r.uploadedBy.toLowerCase().includes(searchTerm)
+        r.uploadedBy.toLowerCase().includes(searchTerm) ||
+        r.category.toLowerCase().includes(searchTerm)
       );
     });
 
     if (activeTab === "favorites") {
-      filtered = resources.filter(r => favoriteResources.includes(r.id));
+      filtered = filtered.filter(r => favoriteResources.includes(r.id));
+    }
+
+    if (activeTab === "admin-queue") {
+      filtered = filtered.filter(r => !r.validated);
     }
 
     if (activeTab === "feed") {
-      // Prioritize user's courses and then by quality score
+      // Filter out non-validated for non-admins
+      if (!isAdmin) {
+        filtered = filtered.filter(r => r.validated);
+      }
+      // Prioritize by quality score
       return filtered.sort((a, b) => {
-        const aInUserCourses = userCourses.includes(a.course) ? 1 : 0;
-        const bInUserCourses = userCourses.includes(b.course) ? 1 : 0;
-        
-        if (aInUserCourses !== bInUserCourses) {
-          return bInUserCourses - aInUserCourses;
-        }
-        
         return (b.qualityScore || 0) - (a.qualityScore || 0);
       });
     }
 
     return filtered;
-  }, [resources, search, userCourses, activeTab]);
+  }, [resources, search, favoriteResources, activeTab, isAdmin]);
 
   return (
     <div className="w-full max-w-5xl mx-auto px-4 pb-24">
@@ -334,16 +362,16 @@ export default function ResourceMarketplace({ user, isAdmin }: { user?: any, isA
           </div>
           <button 
             onClick={() => {
-              if (isVerifiedUser || isAdmin) {
+              if (settings.canEveryoneUpload || isVerifiedUser || isAdmin) {
                 setShowUpload(true);
               } else {
-                toast("Verification Required: Only verified students can contribute to the marketplace.");
+                toast("Upload Restricted: Only verified students can contribute to the marketplace.");
               }
             }}
-            className={`${isVerifiedUser || isAdmin ? 'bg-cyan-600 hover:bg-cyan-700 shadow-cyan-500/20' : 'bg-zinc-500/20 text-zinc-500 cursor-not-allowed'} text-white px-6 py-3 rounded-2xl font-bold flex items-center gap-2 shadow-lg transition-all active:scale-95`}
+            className={`${settings.canEveryoneUpload || isVerifiedUser || isAdmin ? 'bg-cyan-600 hover:bg-cyan-700 shadow-cyan-500/20' : 'bg-zinc-500/20 text-zinc-500 cursor-not-allowed'} text-white px-6 py-3 rounded-2xl font-bold flex items-center gap-2 shadow-lg transition-all active:scale-95`}
           >
             <Upload size={20} /> Upload
-            {(!isVerifiedUser && !isAdmin) && <Star size={12} className="text-zinc-400" />}
+            {(!settings.canEveryoneUpload && !isVerifiedUser && !isAdmin) && <Star size={12} className="text-zinc-400" />}
           </button>
         </div>
 
@@ -377,6 +405,14 @@ export default function ResourceMarketplace({ user, isAdmin }: { user?: any, isA
             >
               My Uploads
             </button>
+            {isAdmin && (
+              <button 
+                onClick={() => setActiveTab("admin-queue")}
+                className={`px-6 py-3 rounded-xl text-sm font-bold transition-all whitespace-nowrap ${activeTab === "admin-queue" ? "bg-white dark:bg-zinc-800 shadow-sm text-red-600" : "text-[var(--foreground)]/50 hover:text-[var(--foreground)]"}`}
+              >
+                Admin Queue
+              </button>
+            )}
           </div>
         </div>
       </div>
@@ -417,6 +453,15 @@ export default function ResourceMarketplace({ user, isAdmin }: { user?: any, isA
                       <span className="text-xs font-black bg-cyan-500/10 text-cyan-700 dark:text-cyan-400 px-3 py-1 rounded-lg tracking-tighter">
                         {resource.course}
                       </span>
+                      {resource.validated ? (
+                          <span className="text-xs font-black bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 px-3 py-1 rounded-lg tracking-tighter">
+                            Verified
+                          </span>
+                      ) : (
+                          <span className="text-xs font-black bg-amber-500/10 text-amber-700 dark:text-amber-400 px-3 py-1 rounded-lg tracking-tighter">
+                            Pending
+                          </span>
+                      )}
                     </div>
                     <div className="flex items-center gap-1 text-amber-500">
                       <Star size={14} className="fill-amber-500" />
@@ -454,20 +499,27 @@ export default function ResourceMarketplace({ user, isAdmin }: { user?: any, isA
 
                 <div className="space-y-4">
                   <div className="flex items-center justify-between bg-black/5 dark:bg-white/5 p-2 rounded-2xl">
+                    <span className="text-xs font-bold text-cyan-600 dark:text-cyan-400">Score: {resource.qualityScore || 0}</span>
                     <div className="flex items-center gap-4">
                       <button 
-                        onClick={() => handleSocialAction(resource.id, "like")}
+                        onClick={() => handleSocialAction(resource, "like")}
                         className={`flex items-center gap-1 text-xs font-bold transition-all ${likedResources.includes(resource.id) ? 'text-cyan-500' : 'text-[var(--foreground)]/40 hover:text-cyan-500'}`}
                       >
                         <ThumbsUp size={16} className={likedResources.includes(resource.id) ? 'fill-cyan-500' : ''} />
                         {resource.likes}
                       </button>
                       <button 
-                        onClick={() => handleSocialAction(resource.id, "dislike")}
+                        onClick={() => handleSocialAction(resource, "dislike")}
                         className={`flex items-center gap-1 text-xs font-bold transition-all ${dislikedResources.includes(resource.id) ? 'text-red-500' : 'text-[var(--foreground)]/40 hover:text-red-500'}`}
                       >
                         <ThumbsDown size={16} className={dislikedResources.includes(resource.id) ? 'fill-red-500' : ''} />
                         {resource.dislikes}
+                      </button>
+                      <button 
+                        onClick={() => shareResource(resource)}
+                        className="text-[var(--foreground)]/40 hover:text-cyan-500 transition-all"
+                      >
+                        <Share2 size={16} />
                       </button>
                     </div>
                     <a 
@@ -479,6 +531,15 @@ export default function ResourceMarketplace({ user, isAdmin }: { user?: any, isA
                       <Download size={16} />
                     </a>
                   </div>
+
+                  {isAdmin && !resource.validated && (
+                    <button 
+                      onClick={() => validateResource(resource.id)}
+                      className="w-full py-2 bg-emerald-500/10 text-emerald-500 rounded-xl text-xs font-bold hover:bg-emerald-500 hover:text-white transition-all mb-2"
+                    >
+                      Validate Material
+                    </button>
+                  )}
 
                   {activeTab === "my-uploads" && (
                     <button 
@@ -546,7 +607,7 @@ export default function ResourceMarketplace({ user, isAdmin }: { user?: any, isA
 
               <form onSubmit={handleUpload} className="space-y-4 relative z-10">
                 <div className="grid grid-cols-3 gap-2 p-1 bg-black/5 dark:bg-white/5 rounded-2xl border border-[var(--border)]">
-                  {(["PDF", "Image", "Link"] as const).map(type => (
+                  {(["PDF", "Image", "Note"] as const).map(type => (
                     <button
                       key={type}
                       type="button"
@@ -587,47 +648,46 @@ export default function ResourceMarketplace({ user, isAdmin }: { user?: any, isA
                   />
                 </div>
                 
-                {newResource.type === "Link" ? (
-                  <div className="space-y-1">
-                    <label className="text-[10px] font-black text-[var(--foreground)]/40 uppercase tracking-widest ml-2">External URL</label>
+                <div className="space-y-1">
+                  <label className="text-[10px] font-black text-[var(--foreground)]/40 uppercase tracking-widest ml-2">Category</label>
+                  <select 
+                    value={newResource.category}
+                    onChange={(e) => setNewResource({...newResource, category: e.target.value})}
+                    className="w-full bg-black/5 dark:bg-white/5 border border-[var(--border)] rounded-2xl p-4 text-sm font-bold focus:outline-none focus:border-cyan-500 transition-all"
+                    disabled={isUploading}
+                  >
+                    {["Notes", "Past Questions", "Textbooks", "Assignments"].map(cat => (
+                      <option key={cat} value={cat}>{cat}</option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="space-y-1">
+                  <label className="text-[10px] font-black text-[var(--foreground)]/40 uppercase tracking-widest ml-2">Select {newResource.type} File</label>
+                  <div 
+                    onClick={() => !isUploading && fileInputRef.current?.click()}
+                    className="w-full border-2 border-dashed border-[var(--border)] rounded-2xl p-8 flex flex-col items-center justify-center cursor-pointer hover:bg-cyan-500/5 hover:border-cyan-500/30 transition-all group"
+                  >
                     <input 
-                      type="url" 
-                      placeholder="Google Drive, Dropbox, etc." 
-                      value={newResource.url}
-                      onChange={(e) => setNewResource({...newResource, url: e.target.value})}
-                      className="w-full bg-black/5 dark:bg-white/5 border border-[var(--border)] rounded-2xl p-4 text-sm font-bold focus:outline-none focus:border-cyan-500 transition-all"
-                      required
-                      disabled={isUploading}
+                      type="file" 
+                      accept={newResource.type === "PDF" ? "application/pdf" : "image/*"}
+                      ref={fileInputRef}
+                      onChange={(e) => setSelectedFile(e.target.files?.[0] || null)}
+                      className="hidden"
                     />
+                    {selectedFile ? (
+                      <div className="flex items-center gap-2 text-cyan-600 font-bold">
+                        <CheckCircle2 size={20} />
+                        <span className="text-sm truncate max-w-[200px]">{selectedFile.name}</span>
+                      </div>
+                    ) : (
+                      <>
+                        <Upload className="text-[var(--foreground)]/20 group-hover:text-cyan-500 transition-colors mb-2" size={32} />
+                        <p className="text-xs font-bold text-[var(--foreground)]/40">Drop file or click to browse</p>
+                      </>
+                    )}
                   </div>
-                ) : (
-                  <div className="space-y-1">
-                    <label className="text-[10px] font-black text-[var(--foreground)]/40 uppercase tracking-widest ml-2">Select {newResource.type}</label>
-                    <div 
-                      onClick={() => !isUploading && fileInputRef.current?.click()}
-                      className="w-full border-2 border-dashed border-[var(--border)] rounded-2xl p-8 flex flex-col items-center justify-center cursor-pointer hover:bg-cyan-500/5 hover:border-cyan-500/30 transition-all group"
-                    >
-                      <input 
-                        type="file" 
-                        accept={newResource.type === "PDF" ? "application/pdf" : "image/*"}
-                        ref={fileInputRef}
-                        onChange={(e) => setSelectedFile(e.target.files?.[0] || null)}
-                        className="hidden"
-                      />
-                      {selectedFile ? (
-                        <div className="flex items-center gap-2 text-cyan-600 font-bold">
-                          <CheckCircle2 size={20} />
-                          <span className="text-sm truncate max-w-[200px]">{selectedFile.name}</span>
-                        </div>
-                      ) : (
-                        <>
-                          <Upload className="text-[var(--foreground)]/20 group-hover:text-cyan-500 transition-colors mb-2" size={32} />
-                          <p className="text-xs font-bold text-[var(--foreground)]/40">Drop file or click to browse</p>
-                        </>
-                      )}
-                    </div>
-                  </div>
-                )}
+                </div>
 
                 <button 
                   type="submit" 

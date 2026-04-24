@@ -5,7 +5,7 @@ declare global {
 }
 
 import React, { useState, useEffect } from "react";
-import { Helmet } from "react-helmet-async";
+import { Helmet } from "../components/Helmet";
 import { toast } from "../components/Toast";
 import { Loader2, CreditCard, ShieldCheck } from "lucide-react";
 import { getSettings } from "../lib/settings";

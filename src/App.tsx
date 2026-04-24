@@ -1,7 +1,8 @@
+import NexusLogo from "./components/NexusLogo";
 import { HashRouter as Router, Routes, Route, Link, useLocation, useNavigate } from "react-router-dom";
 import { ThemeProvider, useTheme } from "./components/theme-provider";
 import { getSettings, subscribeToSettings } from "./lib/settings";
-import { HelmetProvider, Helmet } from "react-helmet-async";
+import { Helmet } from "./components/Helmet";
 import { useEffect, useState, Suspense, lazy } from "react";
 import { onAuthStateChanged, signInWithPopup, GoogleAuthProvider, signOut, browserPopupRedirectResolver, signInAnonymously, signInWithRedirect, getRedirectResult } from "firebase/auth";
 import { auth, db } from "./firebase";
@@ -40,6 +41,7 @@ import Tutorial from "./components/Tutorial";
 import FloatingAI from "./components/FloatingAI";
 import ShareModal from "./components/ShareModal";
 import OfflineBanner from "./components/OfflineBanner";
+import { useNotifications } from "./lib/notifications";
 
 import BottomNav from "./nexus-features/BottomNav";
 
@@ -66,6 +68,8 @@ function MainApp() {
   const location = useLocation();
   const navigate = useNavigate();
   const isAIChatPage = location.pathname === "/validate" || location.pathname === "/cbt";
+  
+  useNotifications(user?.uid);
 
   const [loginError, setLoginError] = useState<string | null>(null);
   const [isLoggingIn, setIsLoggingIn] = useState(false);
@@ -352,7 +356,7 @@ function MainApp() {
         <div className="max-w-7xl mx-auto flex justify-between items-center">
           <div className="flex items-center gap-8">
             <Link to="/" className="text-xl font-bold tracking-tighter flex items-center gap-2">
-              Digital Nexus
+              <NexusLogo className="w-8 h-8" />
             </Link>
             <div className="hidden md:flex gap-6 text-sm font-medium text-[var(--foreground)]/70">
               {navLinks.map((link) => (
@@ -567,14 +571,12 @@ function MainApp() {
 
 export default function App() {
   return (
-    <HelmetProvider>
-      <ThemeProvider defaultTheme="dark" storageKey="vite-ui-theme">
-        <Router>
-          <ErrorBoundary>
-            <MainApp />
-          </ErrorBoundary>
-        </Router>
-      </ThemeProvider>
-    </HelmetProvider>
+    <ThemeProvider defaultTheme="dark" storageKey="vite-ui-theme">
+      <Router>
+        <ErrorBoundary>
+          <MainApp />
+        </ErrorBoundary>
+      </Router>
+    </ThemeProvider>
   );
 }
