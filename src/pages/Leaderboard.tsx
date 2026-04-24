@@ -105,6 +105,25 @@ export default function Leaderboard({ user }: { user: any }) {
           )}
         </div>
       </div>
+      
+      {/* Top Contributors this Week */}
+      <div className="glass-panel p-6 rounded-3xl">
+        <h2 className="text-xl font-bold mb-4 flex items-center gap-2">
+           <Award className="text-cyan-500" /> Top Contributors this Week
+        </h2>
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            {leaders.slice(0, 4).map((leader, index) => (
+                <div key={leader.id} className="flex flex-col items-center gap-2 p-4 bg-black/5 dark:bg-white/5 rounded-2xl border border-[var(--border)]">
+                    <img src={leader.photoURL} alt={leader.displayName} className="w-16 h-16 rounded-full" />
+                    <div className="text-center">
+                        <p className="font-bold text-sm truncate">{leader.displayName}</p>
+                        {index === 0 && <span className="text-[10px] bg-cyan-500/20 text-cyan-600 px-2 py-0.5 rounded-full font-bold">Nexus Legend 🌟</span>}
+                        {index > 0 && <span className="text-[10px] text-[var(--foreground)]/50">Contributor</span>}
+                    </div>
+                </div>
+            ))}
+        </div>
+      </div>
     </div>
   );
 }

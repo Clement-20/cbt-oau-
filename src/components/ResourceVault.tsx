@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, useMemo } from "react";
 import { Upload, FileText, Download, Search, Trash2, X, Loader2, ThumbsUp, ThumbsDown, UserPlus, UserMinus, Filter, ChevronDown, BookOpen, Clock, Star, ExternalLink, Image as ImageIcon, File as FileIcon, User, Share2 } from "lucide-react";
 import { collection, onSnapshot, query, orderBy, addDoc, serverTimestamp, deleteDoc, doc, getDocs, where, updateDoc, increment, limit, startAfter, getDoc, QueryDocumentSnapshot } from "firebase/firestore";
-import { ref, uploadBytesResumable, getDownloadURL } from "firebase/storage";
+import { ref, uploadBytes, uploadBytesResumable, getDownloadURL } from "firebase/storage";
 import { db, storage, auth } from "../firebase";
 import { toast } from "./Toast";
 import ConfirmModal from "./ConfirmModal";
@@ -210,34 +210,32 @@ export default function ResourceMarketplace({ user, isAdmin }: { user?: any, isA
       
       const storageRef = ref(storage, `resources/${user.uid}_${Date.now()}_${selectedFile.name.replace(/\s+/g, '_')}`);
       
+      console.log(`[Upload] Starting: ${selectedFile.name} (${selectedFile.size} bytes)`);
+      
       const uploadTask = uploadBytesResumable(storageRef, selectedFile);
       
-      // Upload execution with timeout
       finalUrl = await new Promise((resolve, reject) => {
-        const timeoutId = setTimeout(() => {
-          uploadTask.cancel();
-          reject(new Error("Upload timed out (took > 40s). Please check your internet connection."));
-        }, 40000);
-
         uploadTask.on('state_changed', 
           (snapshot) => {
             const progress = (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
+            console.log(`[Upload] Progress: ${progress.toFixed(2)}%`);
             setUploadProgress(progress);
           }, 
           (error) => {
-            clearTimeout(timeoutId);
-            console.error("Firebase Storage Upload Error:", error);
+            console.error("[Upload] Error:", error);
+            setIsUploading(false);
             toast(`Upload failed: ${error.message}`);
             reject(error);
           }, 
           async () => {
-            clearTimeout(timeoutId);
             const downloadURL = await getDownloadURL(uploadTask.snapshot.ref);
+            console.log("[Upload] Success:", downloadURL);
             resolve(downloadURL);
           }
         );
       });
-
+      
+      console.log("Adding document to Firestore...");
       await addDoc(collection(db, "resources"), {
         title: newResource.title,
         type: newResource.type,
@@ -253,6 +251,7 @@ export default function ResourceMarketplace({ user, isAdmin }: { user?: any, isA
         qualityScore: (0 - 0) + (isVerifiedUser ? 10 : 0),
         timestamp: serverTimestamp()
       });
+      console.log("Document added successfully!");
       
       setNewResource({ title: "", type: "PDF", url: "", course: "", category: "Notes" });
       setSelectedFile(null);
@@ -391,10 +390,9 @@ export default function ResourceMarketplace({ user, isAdmin }: { user?: any, isA
                 toast("Upload Restricted: Only verified students can contribute to the marketplace.");
               }
             }}
-            className={`${settings.canEveryoneUpload || isVerifiedUser || isAdmin ? 'bg-cyan-600 hover:bg-cyan-700 shadow-cyan-500/20' : 'bg-zinc-500/20 text-zinc-500 cursor-not-allowed'} text-white px-6 py-3 rounded-2xl font-bold flex items-center gap-2 shadow-lg transition-all active:scale-95`}
+            className="bg-cyan-600 hover:bg-cyan-700 text-white px-8 py-4 rounded-xl font-black text-sm flex items-center gap-2 shadow-lg hover:scale-105 transition-all w-full md:w-auto"
           >
-            <Upload size={20} /> Upload
-            {(!settings.canEveryoneUpload && !isVerifiedUser && !isAdmin) && <Star size={12} className="text-zinc-400" />}
+            <Upload size={20} /> Upload Course Material
           </button>
         </div>
 
@@ -518,7 +516,7 @@ export default function ResourceMarketplace({ user, isAdmin }: { user?: any, isA
                       <div>
                         <p className="text-[10px] font-bold text-[var(--foreground)]/40 uppercase tracking-widest">Uploaded by</p>
                         <div className="flex items-center gap-1">
-                          <p className="text-xs font-bold">{resource.uploadedBy}</p>
+                          <p className="text-xs font-bold">By {resource.uploadedBy}</p>
                           {resource.uploaderVerified && <Star size={10} className="text-blue-500 fill-blue-500" />}
                         </div>
                       </div>
@@ -563,9 +561,9 @@ export default function ResourceMarketplace({ user, isAdmin }: { user?: any, isA
                       href={resource.url}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="p-2 bg-cyan-600 text-white rounded-xl shadow-lg shadow-cyan-500/20 hover:scale-110 transition-all"
+                      className="flex items-center gap-2 bg-cyan-600 hover:bg-cyan-700 text-white px-4 py-2.5 rounded-xl font-bold text-xs transition-all"
                     >
-                      <Download size={16} />
+                      <Download size={14} /> Download/View PDF
                     </a>
                   </div>
 
@@ -729,23 +727,21 @@ export default function ResourceMarketplace({ user, isAdmin }: { user?: any, isA
                 <button 
                   type="submit" 
                   disabled={isUploading}
-                  className="w-full bg-cyan-600 hover:bg-cyan-700 disabled:bg-cyan-800 disabled:cursor-not-allowed text-white py-5 rounded-2xl font-black uppercase tracking-widest transition-all flex flex-col items-center justify-center gap-2 shadow-xl shadow-cyan-500/20"
+                  className="w-full bg-cyan-600 hover:bg-cyan-700 disabled:bg-cyan-800 disabled:cursor-not-allowed text-white py-5 rounded-2xl font-black uppercase tracking-widest transition-all flex flex-col items-center justify-center shadow-xl shadow-cyan-500/20"
                 >
                   {isUploading ? (
-                    <>
-                      <div className="flex items-center gap-2">
+                    <div className="w-full px-6 flex flex-col items-center">
+                      <div className="flex items-center gap-2 mb-3">
                         <Loader2 className="animate-spin" size={20} /> 
-                        <span>{newResource.type === "PDF" ? `Uploading ${Math.round(uploadProgress)}%` : "Processing..."}</span>
+                        <span>Uploading {Math.round(uploadProgress)}%</span>
                       </div>
-                      {newResource.type === "PDF" && (
-                        <div className="w-full bg-white/20 h-1 rounded-full mt-2 overflow-hidden">
-                          <div 
-                            className="bg-white h-full transition-all duration-300" 
-                            style={{ width: `${uploadProgress}%` }}
-                          />
-                        </div>
-                      )}
-                    </>
+                      <div className="w-full bg-black/20 dark:bg-white/20 h-2 rounded-full overflow-hidden">
+                        <div 
+                          className="bg-white h-full transition-all duration-300 ease-out" 
+                          style={{ width: `${uploadProgress}%` }}
+                        />
+                      </div>
+                    </div>
                   ) : "Publish to Marketplace"}
                 </button>
               </form>

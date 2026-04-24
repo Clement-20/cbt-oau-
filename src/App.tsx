@@ -8,7 +8,7 @@ import { onAuthStateChanged, signInWithPopup, GoogleAuthProvider, signOut, brows
 import { auth, db } from "./firebase";
 import { doc, getDoc, setDoc, updateDoc } from "firebase/firestore";
 import { handleFirestoreError, OperationType } from "./utils/errorHandling";
-import { LogIn, LogOut, ShieldAlert, Sun, Moon, Calculator, Share2, Menu, X, User, BadgeCheck, Flame, Loader2, Zap, HelpCircle, Users } from "lucide-react";
+import { LogIn, LogOut, ShieldAlert, Sun, Moon, Calculator, Share2, Menu, X, User, Flame, Loader2, Zap, HelpCircle } from "lucide-react";
 import { clsx } from "clsx";
 import NexusBadge from "./components/NexusBadge";
 import Toast from "./components/Toast";
@@ -27,18 +27,17 @@ const Profile = lazy(() => import("./pages/Profile"));
 const Setup = lazy(() => import("./pages/Setup"));
 const About = lazy(() => import("./pages/About"));
 const Community = lazy(() => import("./pages/Community"));
-const Verification = lazy(() => import("./pages/Verification"));
 const Resources = lazy(() => import("./pages/Resources"));
 const AdminDashboard = lazy(() => import("./pages/AdminDashboard"));
 const NotFound = lazy(() => import("./pages/NotFound"));
 const StudyMode = lazy(() => import("./pages/StudyMode"));
 const AdminSeeder = lazy(() => import("./pages/AdminSeeder"));
 const ForgotPassword = lazy(() => import("./pages/ForgotPassword"));
+const PostUTME = lazy(() => import("./pages/PostUTME"));
 
 import { ErrorBoundary } from "./components/ErrorBoundary";
 import LoadingLogo from "./components/LoadingLogo";
 import Tutorial from "./components/Tutorial";
-import FloatingAI from "./components/FloatingAI";
 import ShareModal from "./components/ShareModal";
 import OfflineBanner from "./components/OfflineBanner";
 import { useNotifications } from "./lib/notifications";
@@ -54,7 +53,6 @@ const LoadingFallback = () => (
 function MainApp() {
   const [user, setUser] = useState<any>(null);
   const [dbUser, setDbUser] = useState<any>(null);
-  const [isPaymentEnabled, setIsPaymentEnabled] = useState(true);
   const [loading, setLoading] = useState(true);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [showTutorial, setShowTutorial] = useState(false);
@@ -67,7 +65,6 @@ function MainApp() {
   const { theme, setTheme } = useTheme();
   const location = useLocation();
   const navigate = useNavigate();
-  const isAIChatPage = location.pathname === "/validate" || location.pathname === "/cbt";
   
   useNotifications(user?.uid);
 
@@ -115,10 +112,6 @@ function MainApp() {
   }, []);
 
   useEffect(() => {
-    const unsubscribeSettings = subscribeToSettings((s) => {
-      setIsPaymentEnabled(s.isPaymentEnabled);
-    });
-
     const unsubscribeAuth = onAuthStateChanged(auth, async (currentUser) => {
       // Keep loading true while we resolve the database profile
       setLoading(true);
@@ -230,7 +223,6 @@ function MainApp() {
       }
     });
     return () => {
-      unsubscribeSettings();
       unsubscribeAuth();
     };
   }, []);
@@ -329,8 +321,7 @@ function MainApp() {
     { path: "/cbt", label: "CBT Engine" },
     { path: "/validate", label: "Validator" },
     { path: "/leaderboard", label: "Leaderboard" },
-    { path: "/study-mode", label: "Study Mode" },
-    ...(isPaymentEnabled ? [{ path: "/verification", label: "Verify Student", icon: <BadgeCheck size={14} /> }] : []),
+    { path: "/post-utme", label: "Post-UTME Test" },
     ...(user?.email === "banmekeifeoluwa@gmail.com" ? [{ path: "/admin-dashboard", label: "Admin", icon: <ShieldAlert size={14} /> }] : []),
     { path: "/about", label: "About", icon: <Zap size={14} /> },
   ];
@@ -514,13 +505,13 @@ function MainApp() {
             <Route path="/cbt" element={<CBT user={user} dbUser={dbUser} isFocusMode={isFocusMode} setIsFocusMode={setIsFocusMode} />} />
             <Route path="/validate" element={<Validator user={user} />} />
             <Route path="/leaderboard" element={<Leaderboard user={user} />} />
+            <Route path="/post-utme" element={<PostUTME />} />
             <Route path="/gpa" element={<GPA user={user} />} />
             <Route path="/aro" element={<Aro user={user} />} />
             <Route path="/profile" element={<Profile user={user} />} />
             <Route path="/setup" element={<Setup user={user} dbUser={dbUser} setDbUser={setDbUser} />} />
             <Route path="/about" element={<About />} />
             <Route path="/community" element={<Community user={user} />} />
-            <Route path="/verification" element={<Verification user={user} />} />
             <Route path="/resources" element={<Resources user={user} />} />
             <Route path="/study-mode" element={<StudyMode user={user} />} />
             <Route path="/forgot-password" element={<ForgotPassword />} />
@@ -550,7 +541,7 @@ function MainApp() {
         />
       )}
       {/* {!isAIChatPage && !showStudyDeck && <FloatingAI />} */}
-      {showStudyDeck && (
+      {/* {showStudyDeck && (
         <StudyDeck 
           user={user} 
           onClose={() => {
@@ -561,7 +552,7 @@ function MainApp() {
           contextText={studyDeckContext}
           initialPrompt={studyDeckPrompt}
         />
-      )}
+      )} */}
       <BottomNav />
       <OfflineBanner />
       <Toast />
