@@ -49,6 +49,44 @@ async function startServer() {
     return !forbidden.some(word => text.toLowerCase().includes(word));
   };
 
+  // API Route: AI Chat (Server-Side Wrapper)
+  app.post("/api/ai/chat", aiLimiter, async (req, res) => {
+    const { messages, contextText } = req.body;
+
+    if (!messages || !Array.isArray(messages)) {
+      return res.status(400).json({ error: "Missing messages." });
+    }
+
+    try {
+      const apiKey = process.env.GEMINI_API_KEY;
+      if (!apiKey) throw new Error("GEMINI_API_KEY is not set.");
+      const ai = new GoogleGenAI({ apiKey });
+      const model = "gemini-1.5-flash";
+      const contents = messages.map(msg => ({
+        role: msg.role === 'user' ? 'user' : 'model',
+        parts: [{ text: msg.text }]
+      }));
+
+      // Add context as system instructions
+      const systemInstruction = contextText 
+        ? `${AI_SYSTEM_INSTRUCTION}\n\nContext Provided:\n${contextText}` 
+        : AI_SYSTEM_INSTRUCTION;
+
+      const result = await ai.models.generateContent({
+        model,
+        contents,
+        config: {
+          systemInstruction
+        }
+      });
+
+      res.json({ text: result.text || "Sorry, I couldn't generate a response." });
+    } catch (error: any) {
+      console.error("AI Chat Error:", error);
+      res.status(500).json({ error: "Failed to generate AI response." });
+    }
+  });
+
   // API Route: AI Explanation (Server-Side Wrapper)
   app.post("/api/ai/explain", aiLimiter, async (req, res) => {
     const { question, options, correctAnswer, userId } = req.body;
@@ -62,8 +100,10 @@ async function startServer() {
     }
 
     try {
-      const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY! });
-      const model = "gemini-3-flash-preview";
+      const apiKey = process.env.GEMINI_API_KEY;
+      if (!apiKey) throw new Error("GEMINI_API_KEY is not set.");
+      const ai = new GoogleGenAI({ apiKey });
+      const model = "gemini-1.5-flash";
       
       const prompt = `Explain the logic behind this question and why the correct answer is "${correctAnswer}".
       

@@ -42,30 +42,27 @@ export default function StudyDeck({ user, onClose, contextText, initialPrompt }:
     if (!messageToSend || isLoading) return;
 
     if (!directPrompt) setInput("");
-    setMessages(prev => [...prev, { role: "user", text: messageToSend }]);
+    const newMessages = [...messages, { role: "user", text: messageToSend }];
+    setMessages(newMessages);
     setIsLoading(true);
 
     try {
-      // Manual response logic since AI API is removed
-      setTimeout(() => {
-        setMessages(prev => [...prev, { 
-          role: "model", 
-          text: "I'm currently in 'Offline Mode' while we perform systems maintenance on the Nexus Core AI. I can still assist with question verifications in the CBT Engine, but full interactive chat is temporarily restricted. Stay focused on your studies!" 
-        }]);
-        setIsLoading(false);
-      }, 1000);
+      const response = await fetch("/api/ai/chat", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ messages: newMessages, contextText })
+      });
+      
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || "Chat request failed");
+      
+      setMessages(prev => [...prev, { role: "model", text: data.text }]);
     } catch (error) {
       console.error("Chat error:", error);
-      setMessages(prev => {
-        const newMessages = [...prev];
-        const lastMessage = newMessages[newMessages.length - 1];
-        if (lastMessage.role === "model" && lastMessage.text === "") {
-          lastMessage.text = "Nexus connection interrupted. Please try again.";
-        } else {
-          newMessages.push({ role: "model", text: "Nexus connection interrupted. Please try again." });
-        }
-        return newMessages;
-      });
+      setMessages(prev => [
+        ...prev, 
+        { role: "model", text: "Nexus connection interrupted. Please try again." }
+      ]);
     } finally {
       setIsLoading(false);
     }

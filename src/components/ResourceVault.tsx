@@ -38,6 +38,7 @@ export default function ResourceMarketplace({ user, isAdmin }: { user?: any, isA
     return subscribeToSettings((s) => setSettings(s));
   }, []);
   const [search, setSearch] = useState("");
+  const [sortBy, setSortBy] = useState<'upload-date' | 'quality-score' | 'likes' | 'dislikes'>('quality-score');
   const [showUpload, setShowUpload] = useState(false);
   const [activeTab, setActiveTab] = useState<"feed" | "my-uploads" | "favorites" | "admin-queue">("feed");
   const [newResource, setNewResource] = useState<{title: string, type: "PDF" | "Image" | "Note", url: string, course: string, category: string}>({ title: "", type: "PDF", url: "", course: "", category: "Notes" });
@@ -197,6 +198,11 @@ export default function ResourceMarketplace({ user, isAdmin }: { user?: any, isA
       return;
     }
 
+    if (selectedFile.size > 20 * 1024 * 1024) {
+      toast("File too large. Maximum size is 20MB.");
+      return;
+    }
+
     setIsUploading(true);
     setUploadProgress(0);
     try {
@@ -205,18 +211,27 @@ export default function ResourceMarketplace({ user, isAdmin }: { user?: any, isA
       const storageRef = ref(storage, `resources/${user.uid}_${Date.now()}_${selectedFile.name.replace(/\s+/g, '_')}`);
       
       const uploadTask = uploadBytesResumable(storageRef, selectedFile);
+      
+      // Upload execution with timeout
       finalUrl = await new Promise((resolve, reject) => {
+        const timeoutId = setTimeout(() => {
+          uploadTask.cancel();
+          reject(new Error("Upload timed out (took > 40s). Please check your internet connection."));
+        }, 40000);
+
         uploadTask.on('state_changed', 
           (snapshot) => {
             const progress = (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
             setUploadProgress(progress);
           }, 
           (error) => {
+            clearTimeout(timeoutId);
             console.error("Firebase Storage Upload Error:", error);
             toast(`Upload failed: ${error.message}`);
             reject(error);
           }, 
           async () => {
+            clearTimeout(timeoutId);
             const downloadURL = await getDownloadURL(uploadTask.snapshot.ref);
             resolve(downloadURL);
           }
@@ -341,14 +356,21 @@ export default function ResourceMarketplace({ user, isAdmin }: { user?: any, isA
       if (!isAdmin) {
         filtered = filtered.filter(r => r.validated);
       }
-      // Prioritize by quality score
+      
+      // Sort
       return filtered.sort((a, b) => {
-        return (b.qualityScore || 0) - (a.qualityScore || 0);
+        switch (sortBy) {
+          case 'upload-date': return (b.timestamp?.seconds || 0) - (a.timestamp?.seconds || 0);
+          case 'likes': return (b.likes || 0) - (a.likes || 0);
+          case 'dislikes': return (b.dislikes || 0) - (a.dislikes || 0);
+          case 'quality-score': 
+          default: return (b.qualityScore || 0) - (a.qualityScore || 0);
+        }
       });
     }
 
     return filtered;
-  }, [resources, search, favoriteResources, activeTab, isAdmin]);
+  }, [resources, search, favoriteResources, activeTab, isAdmin, sortBy]);
 
   return (
     <div className="w-full max-w-5xl mx-auto px-4 pb-24">
@@ -386,6 +408,20 @@ export default function ResourceMarketplace({ user, isAdmin }: { user?: any, isA
               onChange={(e) => setSearch(e.target.value)}
               className="w-full bg-black/5 dark:bg-white/5 border border-[var(--border)] rounded-2xl pl-12 pr-4 py-4 text-lg font-medium focus:outline-none focus:border-cyan-500 transition-all"
             />
+          </div>
+          
+          <div className="flex items-center gap-2 bg-black/5 dark:bg-white/5 p-1 rounded-2xl border border-[var(--border)]">
+            <Filter className="text-[var(--foreground)]/40 ml-3" size={20} />
+            <select 
+              value={sortBy}
+              onChange={(e) => setSortBy(e.target.value as any)}
+              className="bg-transparent py-3 pr-8 text-sm font-bold focus:outline-none min-w-[140px]"
+            >
+              <option value="quality-score">Quality Score</option>
+              <option value="upload-date">Upload Date</option>
+              <option value="likes">Likes</option>
+              <option value="dislikes">Dislikes</option>
+            </select>
           </div>
           <div className="flex bg-black/5 dark:bg-white/5 p-1 rounded-2xl border border-[var(--border)] overflow-x-auto no-scrollbar">
             <button 
