@@ -81,33 +81,48 @@ export default function AdminDashboard({ user, dbUser }: { user: any, dbUser?: a
       </div>
 
       {activeTab === "features" && (
-        <div className="glass-panel p-6 rounded-3xl space-y-4">
-          {features.map((feature) => (
-            <div key={feature.key} className="flex items-center justify-between p-4 bg-black/5 dark:bg-white/5 rounded-2xl border border-[var(--border)]">
-              <span className="font-bold">{feature.label}</span>
-              <button
-                onClick={() => toggleFeature(feature.key)}
-                disabled={toggling === feature.key}
-                className={`p-2 rounded-xl transition-all ${settings[feature.key] ? 'text-emerald-500' : 'text-[var(--foreground)]/30'}`}
-              >
-                {toggling === feature.key ? (
-                  <Loader2 className="animate-spin" size={24} />
-                ) : settings[feature.key] ? (
-                  <ToggleRight size={32} />
-                ) : (
-                  <ToggleLeft size={32} />
-                )}
-              </button>
-            </div>
-          ))}
+        <div className="space-y-2">
+          <h2 className="text-xl font-bold">System Feature Toggles</h2>
+          <p className="text-[var(--foreground)]/50 text-sm">Control the availability of individual platform features.</p>
+
+          <div className="glass-panel p-6 rounded-3xl space-y-4">
+            {features.map((feature) => (
+              <div key={feature.key} className="flex items-center justify-between p-4 bg-black/5 dark:bg-white/5 rounded-2xl border border-[var(--border)]">
+                <span className="font-bold">{feature.label}</span>
+                <button
+                  onClick={() => toggleFeature(feature.key)}
+                  disabled={toggling === feature.key}
+                  className={`p-2 rounded-xl transition-all ${settings[feature.key] ? 'text-emerald-500' : 'text-[var(--foreground)]/30'}`}
+                >
+                  {toggling === feature.key ? (
+                    <Loader2 className="animate-spin" size={24} />
+                  ) : settings[feature.key] ? (
+                    <ToggleRight size={32} />
+                  ) : (
+                    <ToggleLeft size={32} />
+                  )}
+                </button>
+              </div>
+            ))}
+          </div>
         </div>
       )}
       
-      {activeTab === "users" && <UserManagement />}
+      {activeTab === "users" && (
+        <div className="space-y-2">
+           <h2 className="text-xl font-bold">User Account Management</h2>
+           <p className="text-[var(--foreground)]/50 text-sm">Review user list and update admin status privileges.</p>
+           <UserManagement />
+        </div>
+      )}
       
       {activeTab === "analytics" && (
-        <div className="glass-panel p-6 rounded-3xl">
-          <AnalyticsDashboard />
+        <div className="space-y-2">
+          <h2 className="text-xl font-bold">Resource Distribution Analytics</h2>
+          <p className="text-[var(--foreground)]/50 text-sm">Visualize the breakdown of resources currently uploaded per course.</p>
+          <div className="glass-panel p-6 rounded-3xl">
+            <AnalyticsDashboard />
+          </div>
         </div>
       )}
     </div>
