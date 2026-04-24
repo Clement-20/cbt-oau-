@@ -21,7 +21,7 @@ export const subscribeToSettings = (callback: (settings: any) => void) => {
   });
 };
 
-export const updateSettings = async (settings: { isPaymentEnabled: boolean }) => {
+export const updateSettings = async (settings: { [key: string]: any }) => {
   const settingsRef = doc(db, "settings", "global");
   await setDoc(settingsRef, settings, { merge: true });
 };

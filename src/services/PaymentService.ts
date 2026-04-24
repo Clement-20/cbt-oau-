@@ -32,6 +32,12 @@ export const PaymentService = {
    * Initializes the native Paystack popup.
    */
   handlePayment(config: any) {
+    if (!(window as any).PaystackPop) {
+      console.error("Paystack SDK not loaded.");
+      toast("Payment service is currently unavailable. Please refresh and try again.");
+      return;
+    }
+    
     const handler = (window as any).PaystackPop.setup({
       ...config,
       callback: (response: any) => config.onSuccess(response),

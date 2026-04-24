@@ -28,6 +28,7 @@ const About = lazy(() => import("./pages/About"));
 const Community = lazy(() => import("./pages/Community"));
 const Verification = lazy(() => import("./pages/Verification"));
 const Resources = lazy(() => import("./pages/Resources"));
+const AdminDashboard = lazy(() => import("./pages/AdminDashboard"));
 const StudyMode = lazy(() => import("./pages/StudyMode"));
 const AdminSeeder = lazy(() => import("./pages/AdminSeeder"));
 
@@ -501,6 +502,7 @@ function MainApp() {
           <Routes>
             <Route path="/" element={<Home user={user} login={login} isLoggingIn={isLoggingIn} />} />
             <Route path="/admin-dashboard" element={<Admin user={user} />} />
+            <Route path="/admin-settings" element={<AdminDashboard user={user} dbUser={dbUser} />} />
             <Route path="/icepab-admin" element={<Admin user={user} />} />
             <Route path="/admin/seed" element={<AdminSeeder user={user} dbUser={dbUser} />} />
             <Route path="/cbt" element={<CBT user={user} dbUser={dbUser} isFocusMode={isFocusMode} setIsFocusMode={setIsFocusMode} />} />
