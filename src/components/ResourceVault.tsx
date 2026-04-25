@@ -262,12 +262,12 @@ export default function ResourceMarketplace({ user, isAdmin }: { user?: any, isA
     const isValidExtension = allowedExtensions.some(ext => fileName.endsWith(ext));
 
     if (!isValidExtension) {
-      toast("Nexus only accepts .pdf and .docx files for course materials. 🛡️");
+      toast("Invalid file. Only .pdf and .docx extensions are allowed. 🛡️");
       return;
     }
 
     if (selectedFile.size > 10 * 1024 * 1024) {
-      toast("File too large. Maximum size allowed is 10MB per file. 🛡️");
+      toast("Validation failed: File size exceeds the 10MB limit. 🛡️");
       return;
     }
 
@@ -280,7 +280,7 @@ export default function ResourceMarketplace({ user, isAdmin }: { user?: any, isA
       const duplicateSnap = await getDocs(duplicateQuery);
       
       if (!duplicateSnap.empty) {
-        toast("This file has already been uploaded to the Nexus. 🛡️");
+        toast("Upload prevented: A resource with this exact file already exists in the Nexus. 🛡️");
         setIsUploading(false);
         return;
       }
@@ -390,11 +390,11 @@ export default function ResourceMarketplace({ user, isAdmin }: { user?: any, isA
   };
 
   const handleDownload = async (resource: Resource) => {
+    const cloudinaryUrl = resource.url.replace("/upload/fl_attachment/", "/upload/");
+    const fileName = `${resource.title.replace(/[^a-z0-9]/gi, "-") || "nexus-file"}.pdf`;
+
     try {
-      const cloudinaryUrl = resource.url;
-      const fileName = `${resource.title.replace(/[^a-z0-9]/gi, "-") || "nexus-file"}.pdf`;
-      
-      // Increment download count in Firestore first
+      // Increment download count in Firestore
       try {
         const docRef = doc(db, "resources", resource.id);
         await updateDoc(docRef, {
@@ -406,35 +406,36 @@ export default function ResourceMarketplace({ user, isAdmin }: { user?: any, isA
 
       toast("Starting download... 📁");
 
-      try {
-        // Attempt high-fidelity download (Blob approach)
-        // Note: This often fails due to CORS if Cloudinary isn't configured for it
-        const response = await fetch(cloudinaryUrl, {
-          method: 'GET',
-          mode: 'cors',
-        });
-        
-        if (response.ok) {
+      // Implementing the requested downloadNow logic
+      const downloadNow = async (url: string, name: string) => {
+        try {
+          const response = await fetch(url);
+          if (!response.ok) throw new Error("Network response was not ok");
           const fileBlob = await response.blob();
+          
+          // Create a temporary 'internal' link
           const internalLink = window.URL.createObjectURL(fileBlob);
-          const a = document.createElement("a");
+          
+          // Trigger the download invisibly
+          const a = document.createElement('a');
           a.href = internalLink;
-          a.download = fileName;
+          a.download = name || "Digital-Nexus-File.pdf";
           document.body.appendChild(a);
           a.click();
+          
+          // Clean up
           document.body.removeChild(a);
           window.URL.revokeObjectURL(internalLink);
-          toast("Download started! 🚀");
-          return;
+          toast("Download complete! 🚀");
+        } catch (error) {
+          console.error("Download failed:", error);
+          // Fallback to direct link if fetch fails (CORS)
+          window.open(url, "_blank", "noopener,noreferrer");
+          toast("Network error. Opened in new tab instead. 🌐");
         }
-      } catch (fetchErr) {
-        console.warn("Fetch download failed (likely CORS), falling back to direct link:", fetchErr);
-      }
+      };
 
-      // Fallback: Direct opening in new tab
-      // This is the most reliable way to handle cross-origin files without specific CORS headers
-      window.open(cloudinaryUrl, "_blank", "noopener,noreferrer");
-      toast("Opening in viewer... 📁");
+      await downloadNow(cloudinaryUrl, fileName);
       
     } catch (error) {
       console.error("Critical download failure:", error);
@@ -911,7 +912,31 @@ export default function ResourceMarketplace({ user, isAdmin }: { user?: any, isA
                       type="file" 
                       accept=".pdf,.docx,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
                       ref={fileInputRef}
-                      onChange={(e) => setSelectedFile(e.target.files?.[0] || null)}
+                      onChange={(e) => {
+                        const file = e.target.files?.[0] || null;
+                        if (!file) {
+                          setSelectedFile(null);
+                          return;
+                        }
+                        
+                        const allowedExtensions = ['.pdf', '.docx'];
+                        const fileName = file.name.toLowerCase();
+                        const isValidExtension = allowedExtensions.some(ext => fileName.endsWith(ext));
+
+                        if (!isValidExtension) {
+                          toast("Invalid file type. Only .pdf and .docx files are allowed. 🛡️");
+                          e.target.value = "";
+                          return;
+                        }
+
+                        if (file.size > 10 * 1024 * 1024) {
+                          toast("File too large. Maximum size allowed is 10MB. 🛡️");
+                          e.target.value = "";
+                          return;
+                        }
+
+                        setSelectedFile(file);
+                      }}
                       className="hidden"
                     />
                     {selectedFile ? (

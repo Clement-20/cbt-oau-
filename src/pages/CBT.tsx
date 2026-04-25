@@ -66,6 +66,8 @@ export default function CBT({ user, dbUser, isFocusMode, setIsFocusMode }: { use
   const [isLoadingCourses, setIsLoadingCourses] = useState(true);
   const [isLoadingTests, setIsLoadingTests] = useState(true);
   const [userAnswers, setUserAnswers] = useState<(number | null)[]>([]);
+  const [serverResults, setServerResults] = useState<any[]>([]);
+  const [isGrading, setIsGrading] = useState(false);
   const [reviewIndex, setReviewIndex] = useState<number | null>(null);
   const [timePerQuestion, setTimePerQuestion] = useState<number[]>([]);
   const [lastQuestionTime, setLastQuestionTime] = useState<number>(0);
@@ -116,6 +118,7 @@ export default function CBT({ user, dbUser, isFocusMode, setIsFocusMode }: { use
   };
 
   const shuffleQuestion = (q: Question): Question => {
+    if (q.correctAnswer === undefined) return q;
     const originalCorrectOption = q.options[q.correctAnswer];
     const shuffledOptions = shuffle(q.options);
     const newCorrectAnswer = shuffledOptions.indexOf(originalCorrectOption);
@@ -272,9 +275,20 @@ export default function CBT({ user, dbUser, isFocusMode, setIsFocusMode }: { use
       if (!course) return;
       
       const count = questionLimit;
-      const rawQs = [...course.questions].sort(() => 0.5 - Math.random()).slice(0, count);
-      const shuffledQs = rawQs.map(q => shuffleQuestion(q));
-      setQuestions(shuffledQs);
+      
+      try {
+        const response = await fetch(`/api/questions/${encodeURIComponent(courseCode)}?count=${count}`);
+        if (!response.ok) throw new Error("Failed to fetch questions");
+        const scrubbedQs = await response.json();
+        setQuestions(scrubbedQs);
+      } catch (err) {
+        console.error(err);
+        // Fallback to local if API fails (but local has answers, so API is preferred)
+        const rawQs = [...course.questions].sort(() => 0.5 - Math.random()).slice(0, count);
+        const shuffledQs = rawQs.map(q => shuffleQuestion(q));
+        setQuestions(shuffledQs);
+      }
+
       setCurrentHostedTestId(null);
       setCurrentHostId(null);
       
@@ -340,14 +354,45 @@ export default function CBT({ user, dbUser, isFocusMode, setIsFocusMode }: { use
     newTimePerQ[currentQuestionIndex] = (newTimePerQ[currentQuestionIndex] || 0) + timeSpentOnThisQ;
     setTimePerQuestion(newTimePerQ);
 
+    setIsGrading(true);
     let finalScore = 0;
-    questions.forEach((q, idx) => {
-      if (userAnswers[idx] === q.correctAnswer) {
-        finalScore++;
+    
+    try {
+      const resp = await fetch("/api/grade-quiz", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          courseCode: selectedCourse,
+          answers: userAnswers,
+          questions: questions
+        })
+      });
+      
+      if (resp.ok) {
+        const data = await resp.json();
+        finalScore = data.score;
+        setServerResults(data.results);
+      } else {
+        // Fallback grading if API fails
+        questions.forEach((q, idx) => {
+          if (userAnswers[idx] === q.correctAnswer) {
+            finalScore++;
+          }
+        });
       }
-    });
+    } catch (err) {
+      console.error("Grading error:", err);
+      // Fallback
+      questions.forEach((q, idx) => {
+        if (userAnswers[idx] === q.correctAnswer) {
+          finalScore++;
+        }
+      });
+    }
+
     setScore(finalScore);
     setIsFinished(true);
+    setIsGrading(false);
     localStorage.removeItem("nexus_cbt_session");
 
     if (user) {
@@ -457,7 +502,7 @@ export default function CBT({ user, dbUser, isFocusMode, setIsFocusMode }: { use
       const topic = q.topic || "General";
       if (!topicStats[topic]) topicStats[topic] = { correct: 0, total: 0 };
       topicStats[topic].total++;
-      if (userAnswers[idx] === q.correctAnswer) topicStats[topic].correct++;
+      if (serverResults[idx]?.isCorrect) topicStats[topic].correct++;
     });
 
     const averageTime = timePerQuestion.reduce((a, b) => a + b, 0) / questions.length;
@@ -533,7 +578,7 @@ export default function CBT({ user, dbUser, isFocusMode, setIsFocusMode }: { use
             </h3>
             <div className="flex flex-wrap justify-center gap-2">
               {questions.map((_, idx) => {
-                const isCorrect = userAnswers[idx] === questions[idx].correctAnswer;
+                const isCorrect = serverResults[idx]?.isCorrect;
                 return (
                   <button
                     key={idx}
@@ -562,7 +607,7 @@ export default function CBT({ user, dbUser, isFocusMode, setIsFocusMode }: { use
               <p className="text-lg mb-6 leading-relaxed">{questions[reviewIndex].question}</p>
               <div className="grid gap-3">
                 {questions[reviewIndex].options.map((opt, idx) => {
-                  const isCorrect = idx === questions[reviewIndex].correctAnswer;
+                  const isCorrect = opt === serverResults[reviewIndex]?.correctAnswer;
                   const isUserAnswer = idx === userAnswers[reviewIndex];
                   
                   let statusClass = "bg-black/5 dark:bg-white/5 border-[var(--border)]";
@@ -583,10 +628,10 @@ export default function CBT({ user, dbUser, isFocusMode, setIsFocusMode }: { use
                 <AITutor 
                   question={questions[reviewIndex].question}
                   options={questions[reviewIndex].options}
-                  correctAnswer={questions[reviewIndex].options[questions[reviewIndex].correctAnswer]}
+                  correctAnswer={serverResults[reviewIndex]?.correctAnswer}
                   isVerified={isVerified}
                   isVisible={true}
-                  autoExplain={userAnswers[reviewIndex] !== questions[reviewIndex].correctAnswer}
+                  autoExplain={!serverResults[reviewIndex]?.isCorrect}
                 />
               </div>
             </div>
@@ -637,7 +682,7 @@ export default function CBT({ user, dbUser, isFocusMode, setIsFocusMode }: { use
     const q = questions[currentQuestionIndex];
     
     const handleExplain = () => {
-      const prompt = `Explain this question and why the correct answer is "${q.options[q.correctAnswer]}":\n\nQuestion: ${q.question}\nOptions: ${q.options.join(", ")}`;
+      const prompt = `Explain this question and its core concepts:\n\nQuestion: ${q.question}\nOptions: ${q.options.join(", ")}`;
       window.dispatchEvent(new CustomEvent("open-ai-assistant", {
         detail: {
           contextText: questions.map(q => q.question).join("\n"),
@@ -651,9 +696,9 @@ export default function CBT({ user, dbUser, isFocusMode, setIsFocusMode }: { use
         <AITutor 
           question={q.question}
           options={q.options}
-          correctAnswer={q.options[q.correctAnswer]}
+          correctAnswer={undefined}
           isVerified={isVerified}
-          isVisible={userAnswers[currentQuestionIndex] !== null}
+          isVisible={false}
         />
         <div className="flex justify-between items-center glass-panel p-5 rounded-2xl">
           <div className="font-bold text-lg tracking-tight">{selectedCourse}</div>

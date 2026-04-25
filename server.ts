@@ -111,6 +111,79 @@ Sitemap: ${BASE_URL}/sitemap.xml`);
     res.send(sitemap);
   });
 
+  // API Route: Get Questions (Scrubbed of answers)
+  app.get("/api/questions/:courseCode", (req, res) => {
+    const courseCode = req.params.courseCode;
+    const count = parseInt(req.query.count as string) || 40;
+    
+    // Find course in local or potentially firestore (for this example using local questions.ts)
+    // In a real app, you might fetch from Firestore here if it's a community course
+    const course = courses.find(c => c.code === courseCode);
+    
+    if (!course) {
+      return res.status(404).json({ error: "Course not found" });
+    }
+
+    // Shuffle and pick
+    const rawQs = [...course.questions].sort(() => 0.5 - Math.random()).slice(0, count);
+    
+    // Deeper shuffle of options and scrubbing of answer
+    const scrubbedQs = rawQs.map(q => {
+      const originalCorrectOption = q.options[q.correctAnswer];
+      const shuffledOptions = [...q.options].sort(() => 0.5 - Math.random());
+      
+      // We DON'T send the answer index.
+      // We just send the question and options.
+      return {
+        id: q.id,
+        question: q.question,
+        options: shuffledOptions,
+        topic: q.topic
+      };
+    });
+
+    res.json(scrubbedQs);
+  });
+
+  // API Route: Grade Quiz
+  app.post("/api/grade-quiz", (req, res) => {
+    const { courseCode, answers, questions: clientQuestions } = req.body;
+
+    if (!courseCode || !answers || !Array.isArray(answers)) {
+      return res.status(400).json({ error: "Invalid request payload" });
+    }
+
+    const course = courses.find(c => c.code === courseCode);
+    if (!course) {
+      return res.status(404).json({ error: "Course not found" });
+    }
+
+    let score = 0;
+    const results = clientQuestions.map((clientQ: any, idx: number) => {
+      const serverQ = course.questions.find(q => q.id === clientQ.id);
+      if (!serverQ) return { correct: false };
+
+      const userAnswerText = clientQ.options[answers[idx]];
+      const correctAnswerText = serverQ.options[serverQ.correctAnswer];
+      
+      const isCorrect = userAnswerText === correctAnswerText;
+      if (isCorrect) score++;
+
+      return {
+        id: clientQ.id,
+        userAnswer: userAnswerText,
+        correctAnswer: correctAnswerText,
+        isCorrect
+      };
+    });
+
+    res.json({
+      score,
+      totalQuestions: clientQuestions.length,
+      results
+    });
+  });
+
   // Vite middleware for development
   if (process.env.NODE_ENV !== "production") {
     const vite = await createViteServer({

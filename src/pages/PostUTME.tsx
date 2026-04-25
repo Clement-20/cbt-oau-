@@ -1,7 +1,11 @@
 import React, { useState, useEffect, useMemo } from "react";
 import { Helmet } from "react-helmet-async";
-import { BookOpen, Timer, Award, Sparkles } from "lucide-react";
+import { BookOpen, Timer, Award, Sparkles, BrainCircuit } from "lucide-react";
 import { subjectQuestions, Question } from "../lib/postUtmeQuestions";
+import AITutor from "../nexus-features/AITutor";
+import { useAcademicStore } from "../lib/academicStore";
+import { auth, db } from "../firebase";
+import { getDoc, doc } from "firebase/firestore";
 
 export default function PostUTME() {
   const [examStarted, setExamStarted] = useState(false);
@@ -12,6 +16,7 @@ export default function PostUTME() {
   const [submitted, setSubmitted] = useState(false);
   const [showCorrections, setShowCorrections] = useState(false);
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
+  const [explainQuestionId, setExplainQuestionId] = useState<number | null>(null);
 
   const faculties = [
     { name: "Science / Technology / Medicine", subjects: ["English", "Mathematics", "Physics", "Chemistry"] },
@@ -273,6 +278,7 @@ export default function PostUTME() {
           {activeQuestions.map((q, idx) => {
             const userAnswer = answers[q.id];
             const isCorrect = userAnswer === q.correctAnswer;
+            const isExplaining = explainQuestionId === q.id;
             
             return (
               <div key={q.id} className="glass-panel p-6 rounded-3xl space-y-4">
@@ -283,7 +289,21 @@ export default function PostUTME() {
                     </span>
                 </div>
                 <h3 className="text-xl font-bold">{idx + 1}. {q.question}</h3>
-                <div className="space-y-2">
+                
+                {!isCorrect && (
+                   <div className="bg-red-500/10 border border-red-500/20 p-4 rounded-2xl mb-4">
+                      {userAnswer === undefined ? (
+                         <p className="text-amber-500 font-bold">You skipped this question.</p>
+                      ) : (
+                         <p className="text-red-500 font-bold line-through">Your Answer: {q.options[userAnswer]}</p>
+                      )}
+                      <p className="text-green-500 font-bold mt-2 flex items-center gap-2">
+                        <Award size={18} /> Correct Answer: {q.options[q.correctAnswer]}
+                      </p>
+                   </div>
+                )}
+                
+                <div className="space-y-2 opacity-60 pointer-events-none">
                   {q.options.map((option, i) => {
                     let className = "w-full text-left p-4 rounded-2xl border-2 transition-all opacity-50 border-transparent bg-black/5";
                     if (i === q.correctAnswer) {
@@ -299,6 +319,28 @@ export default function PostUTME() {
                     );
                   })}
                 </div>
+
+                {!isCorrect && !isExplaining && (
+                  <button 
+                    onClick={() => setExplainQuestionId(q.id)}
+                    className="mt-4 px-6 py-3 rounded-xl font-bold bg-cyan-600/20 hover:bg-cyan-600/40 text-cyan-400 transition-colors flex items-center gap-2 text-sm"
+                  >
+                    <BrainCircuit size={18} /> Explain with AI Tutor
+                  </button>
+                )}
+
+                {isExplaining && (
+                  <div className="mt-6 pt-6 border-t border-white/10">
+                      <AITutor 
+                        question={q.question}
+                        options={q.options}
+                        correctAnswer={q.correctAnswer}
+                        isVerified={auth.currentUser?.emailVerified || false}
+                        isVisible={true}
+                        autoExplain={true}
+                      />
+                  </div>
+                )}
               </div>
             );
           })}
