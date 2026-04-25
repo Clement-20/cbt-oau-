@@ -1,5 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { Command } from "cmdk";
+import * as Dialog from "@radix-ui/react-dialog";
+import { VisuallyHidden } from "@radix-ui/react-visually-hidden";
 import { Search, BookOpen, Calculator, Trophy, ShieldCheck, User, Settings, Info, MessageSquare, Home } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 
@@ -42,6 +44,9 @@ export default function CommandPalette() {
         label="Global Search"
         className="fixed inset-0 z-[200] flex items-start justify-center pt-[15vh] p-4 bg-black/60 backdrop-blur-sm"
       >
+        <VisuallyHidden>
+          <Dialog.Title>Global Search Palette</Dialog.Title>
+        </VisuallyHidden>
         <div className="w-full max-w-xl bg-white dark:bg-zinc-900 rounded-3xl border border-zinc-200 dark:border-zinc-800 shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-200">
           <div className="flex items-center border-b border-zinc-100 dark:border-zinc-800 px-4">
             <Search className="text-zinc-400 mr-3" size={18} />

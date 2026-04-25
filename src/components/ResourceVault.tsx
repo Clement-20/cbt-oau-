@@ -711,45 +711,47 @@ export default function ResourceMarketplace({ user, isAdmin }: { user?: any, isA
                 </div>
 
                 <div className="space-y-4">
-                  <div className="flex items-center justify-between bg-black/5 dark:bg-white/5 p-2 rounded-2xl">
-                    <span className="text-xs font-bold text-cyan-600 dark:text-cyan-400">Score: {resource.qualityScore || 0}</span>
-                    <div className="flex items-center gap-4">
-                      <button 
-                        onClick={() => handleSocialAction(resource, "like")}
-                        className={`flex items-center gap-1 text-xs font-bold transition-all ${likedResources.includes(resource.id) ? 'text-cyan-500' : 'text-[var(--foreground)]/40 hover:text-cyan-500'}`}
-                      >
-                        <ThumbsUp size={16} className={likedResources.includes(resource.id) ? 'fill-cyan-500' : ''} />
-                        {resource.likes}
-                      </button>
-                      <button 
-                        onClick={() => handleSocialAction(resource, "dislike")}
-                        className={`flex items-center gap-1 text-xs font-bold transition-all ${dislikedResources.includes(resource.id) ? 'text-red-500' : 'text-[var(--foreground)]/40 hover:text-red-500'}`}
-                      >
-                        <ThumbsDown size={16} className={dislikedResources.includes(resource.id) ? 'fill-red-500' : ''} />
-                        {resource.dislikes}
-                      </button>
-                      <div className="flex items-center gap-1 text-xs font-bold text-[var(--foreground)]/40">
-                        <Download size={16} />
-                        {resource.downloads || 0}
+                  <div className="flex flex-col sm:flex-row items-center justify-between bg-black/5 dark:bg-white/5 p-3 rounded-2xl gap-3">
+                    <div className="flex items-center justify-between w-full sm:w-auto gap-4">
+                      <span className="text-xs font-bold text-cyan-600 dark:text-cyan-400">Score: {resource.qualityScore || 0}</span>
+                      <div className="flex items-center gap-3 sm:gap-4">
+                        <button 
+                          onClick={() => handleSocialAction(resource, "like")}
+                          className={`flex items-center gap-1 text-xs font-bold transition-all ${likedResources.includes(resource.id) ? 'text-cyan-500' : 'text-[var(--foreground)]/40 hover:text-cyan-500'}`}
+                        >
+                          <ThumbsUp size={16} className={likedResources.includes(resource.id) ? 'fill-cyan-500' : ''} />
+                          {resource.likes}
+                        </button>
+                        <button 
+                          onClick={() => handleSocialAction(resource, "dislike")}
+                          className={`flex items-center gap-1 text-xs font-bold transition-all ${dislikedResources.includes(resource.id) ? 'text-red-500' : 'text-[var(--foreground)]/40 hover:text-red-500'}`}
+                        >
+                          <ThumbsDown size={16} className={dislikedResources.includes(resource.id) ? 'fill-red-500' : ''} />
+                          {resource.dislikes}
+                        </button>
+                        <div className="flex items-center gap-1 text-xs font-bold text-[var(--foreground)]/40">
+                          <Download size={16} />
+                          {resource.downloads || 0}
+                        </div>
+                        <button 
+                          onClick={() => shareResource(resource)}
+                          className="text-[var(--foreground)]/40 hover:text-cyan-500 transition-all"
+                          title="Share Resource"
+                        >
+                          <Share2 size={16} />
+                        </button>
+                        <button 
+                          onClick={() => setReportResource(resource)}
+                          className="text-[var(--foreground)]/40 hover:text-red-500 transition-all"
+                          title="Report Resource"
+                        >
+                          <Flag size={16} />
+                        </button>
                       </div>
-                      <button 
-                        onClick={() => shareResource(resource)}
-                        className="text-[var(--foreground)]/40 hover:text-cyan-500 transition-all"
-                        title="Share Resource"
-                      >
-                        <Share2 size={16} />
-                      </button>
-                      <button 
-                        onClick={() => setReportResource(resource)}
-                        className="text-[var(--foreground)]/40 hover:text-red-500 transition-all"
-                        title="Report Resource"
-                      >
-                        <Flag size={16} />
-                      </button>
                     </div>
                     <button 
                       onClick={() => handleDownload(resource)}
-                      className="flex items-center gap-2 bg-cyan-600 hover:bg-cyan-700 text-white px-4 py-2.5 rounded-xl font-bold text-xs transition-all"
+                      className="w-full sm:w-auto flex items-center justify-center gap-2 bg-cyan-600 hover:bg-cyan-700 text-white px-4 py-2.5 rounded-xl font-bold text-xs transition-all"
                     >
                       <Download size={14} /> Download/View
                     </button>

@@ -27,7 +27,6 @@ const faculties = {
 };
 
 export default function Setup({ user, dbUser, setDbUser }: { user: any, dbUser: any, setDbUser: any }) {
-  const [matricNumber, setMatricNumber] = useState("");
   const [faculty, setFaculty] = useState("");
   const [department, setDepartment] = useState("");
   const [loading, setLoading] = useState(false);
@@ -36,7 +35,7 @@ export default function Setup({ user, dbUser, setDbUser }: { user: any, dbUser: 
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!matricNumber || !faculty || !department) {
+    if (!faculty || !department) {
       setError("Please fill in all fields.");
       return;
     }
@@ -51,7 +50,6 @@ export default function Setup({ user, dbUser, setDbUser }: { user: any, dbUser: 
       }
 
       const updates = {
-        matricNumber: matricNumber.toUpperCase(),
         faculty,
         department,
         ...(college && { college })
@@ -87,18 +85,6 @@ export default function Setup({ user, dbUser, setDbUser }: { user: any, dbUser: 
         )}
 
         <form onSubmit={handleSubmit} className="space-y-5">
-          <div>
-            <label className="block text-sm font-medium text-zinc-300 mb-1">Matric Number</label>
-            <input 
-              type="text" 
-              value={matricNumber}
-              onChange={(e) => setMatricNumber(e.target.value.toUpperCase())}
-              placeholder="e.g., CSC/2019/001"
-              className="w-full bg-black/50 border border-zinc-800 rounded-xl p-3 text-white focus:outline-none focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 transition-colors uppercase"
-              required
-            />
-          </div>
-
           <div>
             <label className="block text-sm font-medium text-zinc-300 mb-1">Faculty</label>
             <select 

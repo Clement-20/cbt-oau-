@@ -177,7 +177,7 @@ function MainApp() {
               return;
             }
 
-            if (!currentUser.isAnonymous && !userData.matricNumber && location.pathname !== "/setup") {
+            if (!currentUser.isAnonymous && (!userData.faculty || !userData.department) && location.pathname !== "/setup") {
               navigate("/setup");
             }
             const now = Date.now();

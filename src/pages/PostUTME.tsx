@@ -303,17 +303,19 @@ export default function PostUTME() {
                    </div>
                 )}
                 
-                <div className="space-y-2 opacity-60 pointer-events-none">
+                <div className="space-y-2">
                   {q.options.map((option, i) => {
-                    let className = "w-full text-left p-4 rounded-2xl border-2 transition-all opacity-50 border-transparent bg-black/5";
+                    let className = "w-full text-left p-4 rounded-2xl border-2 transition-all border-transparent bg-black/5";
                     if (i === q.correctAnswer) {
-                      className = "w-full text-left p-4 rounded-2xl border-2 border-green-500 bg-green-500/20 font-bold";
+                      className = "w-full text-left p-4 rounded-2xl border-2 border-green-500 bg-green-500/20 font-bold text-green-700 dark:text-green-400";
                     } else if (i === userAnswer) {
-                      className = "w-full text-left p-4 rounded-2xl border-2 border-red-500 bg-red-500/20";
+                      className = "w-full text-left p-4 rounded-2xl border-2 border-red-500 bg-red-500/20 text-red-700 dark:text-red-400 opacity-70";
+                    } else {
+                      className += " opacity-50";
                     }
                     return (
                       <div key={i} className={className}>
-                        <span className="inline-block w-8 font-bold opacity-50">{['A', 'B', 'C', 'D'][i]}.</span> 
+                        <span className="inline-block w-8 font-bold opacity-70">{['A', 'B', 'C', 'D'][i]}.</span> 
                         {option}
                       </div>
                     );
@@ -334,7 +336,7 @@ export default function PostUTME() {
                       <AITutor 
                         question={q.question}
                         options={q.options}
-                        correctAnswer={q.correctAnswer}
+                        correctAnswer={q.options[q.correctAnswer]}
                         isVerified={auth.currentUser?.emailVerified || false}
                         isVisible={true}
                         autoExplain={true}

@@ -145,24 +145,20 @@ export default function Admin({ user }: { user: any }) {
     try {
       const emailLower = searchEmail.trim().toLowerCase();
       const emailOriginal = searchEmail.trim();
-      const matricUpper = searchEmail.trim().toUpperCase();
 
       const emailLowerQ = query(collection(db, "users"), where("email", "==", emailLower));
       const emailOriginalQ = query(collection(db, "users"), where("email", "==", emailOriginal));
-      const matricQ = query(collection(db, "users"), where("matricNumber", "==", matricUpper));
       const nameQ = query(collection(db, "users"), where("displayName", "==", emailOriginal));
       
-      const [emailLowerSnap, emailOriginalSnap, matricSnap, nameSnap] = await Promise.all([
+      const [emailLowerSnap, emailOriginalSnap, nameSnap] = await Promise.all([
         getDocs(emailLowerQ), 
         getDocs(emailOriginalQ), 
-        getDocs(matricQ),
         getDocs(nameQ)
       ]);
       
       let foundUser = null;
       if (!emailLowerSnap.empty) foundUser = emailLowerSnap.docs[0];
       else if (!emailOriginalSnap.empty) foundUser = emailOriginalSnap.docs[0];
-      else if (!matricSnap.empty) foundUser = matricSnap.docs[0];
       else if (!nameSnap.empty) foundUser = nameSnap.docs[0];
 
       if (foundUser) {
@@ -347,7 +343,6 @@ export default function Admin({ user }: { user: any }) {
                   <thead>
                     <tr className="bg-black/5 dark:bg-white/5 text-xs font-bold text-[var(--foreground)]/50 uppercase tracking-widest border-b border-[var(--border)]">
                       <th className="p-4">Student</th>
-                      <th className="p-4">Matric Number</th>
                       <th className="p-4">Faculty / Dept</th>
                       <th className="p-4 text-right">Action</th>
                     </tr>
@@ -361,7 +356,6 @@ export default function Admin({ user }: { user: any }) {
                             <span className="font-bold">{u.displayName}</span>
                           </div>
                         </td>
-                        <td className="p-4 font-mono text-sm">{u.matricNumber}</td>
                         <td className="p-4">
                           <div className="text-sm font-medium">{u.faculty}</div>
                           <div className="text-xs text-[var(--foreground)]/50">{u.department}</div>
@@ -426,7 +420,7 @@ export default function Admin({ user }: { user: any }) {
             type="text"
             value={searchEmail}
             onChange={(e) => setSearchEmail(e.target.value)}
-            placeholder="User Email or Matric Number..."
+            placeholder="User Email or Display Name..."
             className="flex-1 bg-black/5 dark:bg-black/50 border border-[var(--border)] rounded-xl p-3 text-[var(--foreground)] focus:outline-none focus:ring-2 focus:ring-blue-500 font-medium"
             required
           />
@@ -449,7 +443,6 @@ export default function Admin({ user }: { user: any }) {
                   {searchResult.isVerified && <BadgeCheck size={16} className="text-blue-500" />}
                 </div>
                 <div className="text-sm text-[var(--foreground)]/60">{searchResult.email}</div>
-                <div className="text-xs text-[var(--foreground)]/40 font-mono">{searchResult.matricNumber || "No Matric"}</div>
               </div>
             </div>
             
