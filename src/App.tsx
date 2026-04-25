@@ -6,9 +6,9 @@ import { Helmet } from "./components/Helmet";
 import { useEffect, useState, Suspense, lazy } from "react";
 import { onAuthStateChanged, signInWithPopup, GoogleAuthProvider, signOut, browserPopupRedirectResolver, signInAnonymously, signInWithRedirect, getRedirectResult } from "firebase/auth";
 import { auth, db } from "./firebase";
-import { doc, getDoc, setDoc, updateDoc } from "firebase/firestore";
+import { doc, getDoc, setDoc, updateDoc, serverTimestamp } from "firebase/firestore";
 import { handleFirestoreError, OperationType } from "./utils/errorHandling";
-import { LogIn, LogOut, ShieldAlert, Sun, Moon, Calculator, Share2, Menu, X, User, Flame, Loader2, Zap, HelpCircle } from "lucide-react";
+import { LogIn, LogOut, ShieldAlert, Sun, Moon, Calculator, Share2, Menu, X, User, Flame, Loader2, Zap, HelpCircle, MessageSquare } from "lucide-react";
 import { clsx } from "clsx";
 import NexusBadge from "./components/NexusBadge";
 import Toast from "./components/Toast";
@@ -34,6 +34,7 @@ const StudyMode = lazy(() => import("./pages/StudyMode"));
 const AdminSeeder = lazy(() => import("./pages/AdminSeeder"));
 const ForgotPassword = lazy(() => import("./pages/ForgotPassword"));
 const PostUTME = lazy(() => import("./pages/PostUTME"));
+const Reviews = lazy(() => import("./pages/Reviews"));
 
 import { ErrorBoundary } from "./components/ErrorBoundary";
 import LoadingLogo from "./components/LoadingLogo";
@@ -43,6 +44,7 @@ import OfflineBanner from "./components/OfflineBanner";
 import { useNotifications } from "./lib/notifications";
 
 import BottomNav from "./nexus-features/BottomNav";
+import CommandPalette from "./components/CommandPalette";
 
 const LoadingFallback = () => (
   <div className="min-h-[60vh] flex flex-col items-center justify-center">
@@ -140,7 +142,7 @@ function MainApp() {
               dailyTokenCount: 0,
               lastTokenReset: new Date().toISOString().split('T')[0],
               shanaPeriodStart: Date.now(),
-              createdAt: new Date().toISOString()
+              createdAt: serverTimestamp()
             } : {
               uid: currentUser.uid,
               email: currentUser.email?.trim().toLowerCase(),
@@ -157,7 +159,7 @@ function MainApp() {
               dailyTokenCount: 0,
               lastTokenReset: new Date().toISOString().split('T')[0],
               shanaPeriodStart: Date.now(),
-              createdAt: new Date().toISOString()
+              createdAt: serverTimestamp()
             };
             await setDoc(userRef, newUserData);
             setDbUser(newUserData);
@@ -322,6 +324,7 @@ function MainApp() {
     { path: "/validate", label: "Validator" },
     { path: "/leaderboard", label: "Leaderboard" },
     { path: "/post-utme", label: "Post-UTME Test" },
+    { path: "/reviews", label: "Reviews", icon: <MessageSquare size={14} /> },
     ...(user?.email === "banmekeifeoluwa@gmail.com" ? [{ path: "/admin-dashboard", label: "Admin", icon: <ShieldAlert size={14} /> }] : []),
     { path: "/about", label: "About", icon: <Zap size={14} /> },
   ];
@@ -506,6 +509,7 @@ function MainApp() {
             <Route path="/validate" element={<Validator user={user} />} />
             <Route path="/leaderboard" element={<Leaderboard user={user} />} />
             <Route path="/post-utme" element={<PostUTME />} />
+            <Route path="/reviews" element={<Reviews />} />
             <Route path="/gpa" element={<GPA user={user} />} />
             <Route path="/aro" element={<Aro user={user} />} />
             <Route path="/profile" element={<Profile user={user} />} />
@@ -554,6 +558,7 @@ function MainApp() {
         />
       )} */}
       <BottomNav />
+      <CommandPalette />
       <OfflineBanner />
       <Toast />
     </div>

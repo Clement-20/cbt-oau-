@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from "react";
 import { Helmet } from "react-helmet-async";
-import { BookOpen, Timer, Award } from "lucide-react";
+import { BookOpen, Timer, Award, Sparkles } from "lucide-react";
 import { subjectQuestions, Question } from "../lib/postUtmeQuestions";
 
 export default function PostUTME() {
@@ -20,17 +20,22 @@ export default function PostUTME() {
   ];
 
   const activeQuestions = useMemo(() => {
-    if (!faculty || !examStarted) return []; // Only generate pool once exam starts
+    if (!faculty || !examStarted) return []; 
     const selectedFaculty = faculties.find(f => f.name === faculty);
     if (!selectedFaculty) return [];
+    
     let qs: Question[] = [];
     selectedFaculty.subjects.forEach(subj => {
-      // Shuffle the subject pool and take 10
-      const shuffled = [...(subjectQuestions[subj] || [])].sort(() => 0.5 - Math.random());
-      qs = qs.concat(shuffled.slice(0, 10));
+      // Get all questions for this subject, shuffle them, and pick 10
+      const pool = subjectQuestions[subj] || [];
+      const shuffledSubjectPool = [...pool].sort(() => 0.5 - Math.random());
+      const selectedForTest = shuffledSubjectPool.slice(0, 10);
+      qs = qs.concat(selectedForTest);
     });
-    // Shuffle the final list of 40 questions
-    return qs.sort(() => 0.5 - Math.random());
+    
+    // We do NOT shuffle the final 'qs' array anymore, 
+    // so questions appear in subject blocks (e.g. all English, then all Math, etc.)
+    return qs;
   }, [faculty, examStarted]);
 
   useEffect(() => {
@@ -105,30 +110,136 @@ export default function PostUTME() {
   }
 
   if (submitted) {
+    const subjectStats: Record<string, { correct: number, total: number }> = {};
+    const topicStats: Record<string, { correct: number, total: number }> = {};
+
+    activeQuestions.forEach(q => {
+      const isCorrect = answers[q.id] === q.correctAnswer;
+      
+      if (!subjectStats[q.subject]) subjectStats[q.subject] = { correct: 0, total: 0 };
+      subjectStats[q.subject].total++;
+      if (isCorrect) subjectStats[q.subject].correct++;
+
+      if (!topicStats[q.topic]) topicStats[q.topic] = { correct: 0, total: 0 };
+      topicStats[q.topic].total++;
+      if (isCorrect) topicStats[q.topic].correct++;
+    });
+
+    const lowPerformingTopics = Object.entries(topicStats)
+      .filter(([_, stats]) => (stats.correct / stats.total) < 0.5)
+      .map(([topic]) => topic);
+
     return (
-      <div className="max-w-2xl mx-auto p-4 pt-20 pb-24 md:pb-8 text-center space-y-6">
-        <h1 className="text-4xl font-black">Result Slip</h1>
-        <div className="glass-panel p-8 rounded-3xl space-y-4">
-          <div className="text-6xl font-black text-cyan-500">
-            {score}/{activeQuestions.length}
+      <div className="max-w-4xl mx-auto p-4 pt-20 pb-24 md:pb-8 space-y-8">
+        <div className="text-center space-y-4">
+          <h1 className="text-4xl font-black">Result Slip</h1>
+          <div className="glass-panel p-8 rounded-3xl space-y-4 max-w-2xl mx-auto">
+            <div className="text-6xl font-black text-cyan-500">
+              {score}/{activeQuestions.length}
+            </div>
+            <p className="font-medium text-lg">OAU Post-UTME Raw Score</p>
+            <div className="w-full h-px bg-white/10 my-4" />
+            <div className="flex justify-between items-center bg-black/10 p-4 rounded-2xl">
+                <div>
+                    <p className="font-bold text-left opacity-70">JAMB Component</p>
+                    <p className="text-2xl font-black text-left">{jambScore > 0 ? (jambScore / 8).toFixed(2) : "0.00"}/50</p>
+                </div>
+                <div className="text-right">
+                    <p className="font-bold opacity-70">Total Aggregate</p>
+                    <p className="text-3xl font-black text-green-500">{aggregate}%</p>
+                </div>
+            </div>
           </div>
-          <p className="font-medium text-lg">OAU Post-UTME Raw Score</p>
-          <div className="w-full h-px bg-white/10 my-4" />
-          <div className="flex justify-between items-center bg-black/10 p-4 rounded-2xl">
-              <div>
-                  <p className="font-bold text-left opacity-70">JAMB Component</p>
-                  <p className="text-2xl font-black text-left">{jambScore > 0 ? (jambScore / 8).toFixed(2) : "0.00"}/50</p>
-              </div>
-              <div className="text-right">
-                  <p className="font-bold opacity-70">Total Aggregate</p>
-                  <p className="text-3xl font-black text-green-500">{aggregate}%</p>
-              </div>
-          </div>
-          <p className="text-sm opacity-60 mt-4 max-w-md mx-auto">
-            Note: OAU admission often uses 50% JAMB (Score / 8), 40% Post-UTME (40 marks), and 10% O’Level. This predictor assumes your 40-question score counts directly.
-          </p>
         </div>
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+
+        {/* Dynamic Study Insights */}
+        <div className="glass-panel p-6 rounded-3xl border-l-4 border-l-cyan-500">
+          <h2 className="text-xl font-black mb-3 flex items-center gap-2">
+            <Sparkles className="text-cyan-500" /> Nexus Study Advice
+          </h2>
+          {lowPerformingTopics.length > 0 ? (
+            <div className="space-y-4">
+              <p className="text-sm opacity-80">
+                Based on your performance, you should focus more on these topics: 
+                <span className="font-bold text-cyan-500 ml-1">
+                  {lowPerformingTopics.join(", ")}
+                </span>.
+              </p>
+              <div className="bg-black/20 p-4 rounded-2xl">
+                <p className="text-xs font-bold uppercase tracking-widest text-zinc-500 mb-2">Recommended Action</p>
+                <button 
+                  onClick={() => window.location.href = "/resources"}
+                  className="text-sm font-bold text-cyan-400 hover:underline flex items-center gap-2"
+                >
+                  <BookOpen size={16} /> Visit the Resource Vault to find materials on these topics
+                </button>
+              </div>
+            </div>
+          ) : (
+            <p className="text-sm opacity-80">
+              Incredible work! You have a solid grasp of most topics. Keep refining your speed and accuracy by retaking the simulation.
+            </p>
+          )}
+        </div>
+
+        <div className="grid md:grid-cols-2 gap-8">
+          <div className="space-y-6">
+            <h2 className="text-2xl font-black flex items-center gap-2">
+              <Award className="text-cyan-500" /> Subject Performance
+            </h2>
+            <div className="grid gap-4">
+              {Object.entries(subjectStats).map(([subj, stats]) => {
+                const perc = (stats.correct / stats.total) * 100;
+                return (
+                  <div key={subj} className="glass-panel p-5 rounded-2xl border border-white/5 space-y-3">
+                    <div className="flex justify-between font-bold">
+                      <span>{subj}</span>
+                      <span className={perc >= 70 ? 'text-green-500' : perc >= 40 ? 'text-amber-500' : 'text-red-500'}>
+                        {stats.correct}/{stats.total} ({perc.toFixed(0)}%)
+                      </span>
+                    </div>
+                    <div className="w-full h-2 bg-black/20 rounded-full overflow-hidden">
+                      <div 
+                        className={`h-full transition-all duration-1000 ${perc >= 70 ? 'bg-green-500' : perc >= 40 ? 'bg-amber-500' : 'bg-red-500'}`}
+                        style={{ width: `${perc}%` }}
+                      />
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+
+          <div className="space-y-6">
+            <h2 className="text-2xl font-black flex items-center gap-2">
+              <BookOpen className="text-purple-500" /> Topic Analysis
+            </h2>
+            <div className="grid gap-3 max-h-[400px] overflow-y-auto pr-2 custom-scrollbar">
+              {Object.entries(topicStats).sort((a, b) => (a[1].correct / a[1].total) - (b[1].correct / b[1].total)).map(([topic, stats]) => {
+                const perc = (stats.correct / stats.total) * 100;
+                return (
+                  <div key={topic} className="bg-black/10 p-3 rounded-xl flex justify-between items-center text-sm">
+                    <span className="font-medium opacity-80">{topic}</span>
+                    <div className="flex items-center gap-3">
+                      <div className="w-24 h-1.5 bg-black/20 rounded-full overflow-hidden hidden sm:block">
+                        <div 
+                          className={`h-full ${perc >= 70 ? 'bg-green-500' : perc >= 40 ? 'bg-amber-500' : 'bg-red-500'}`}
+                          style={{ width: `${perc}%` }}
+                        />
+                      </div>
+                      <span className={`font-bold min-w-[3rem] text-right ${perc >= 70 ? 'text-green-500' : perc >= 40 ? 'text-amber-500' : 'text-red-500'}`}>
+                        {perc.toFixed(0)}%
+                      </span>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+            <p className="text-xs opacity-50 text-center italic">Topics sorted from lowest to highest accuracy to highlight weak areas.</p>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 max-w-2xl mx-auto pt-6">
           <button 
             onClick={() => { setSubmitted(false); setShowCorrections(false); setExamStarted(false); setAnswers({}); setTimeLeft(60 * 60); setCurrentQuestionIndex(0); }}
             className="bg-black/10 text-[var(--foreground)] px-8 py-4 rounded-2xl font-bold hover:bg-black/20 w-full"
@@ -137,9 +248,9 @@ export default function PostUTME() {
           </button>
           <button 
             onClick={() => setShowCorrections(true)}
-            className="bg-cyan-600 text-white px-8 py-4 rounded-2xl font-bold hover:bg-cyan-700 w-full"
+            className="bg-cyan-600 text-white px-8 py-4 rounded-2xl font-bold hover:bg-cyan-700 w-full shadow-lg shadow-cyan-500/20"
           >
-            View Corrections
+            View Review & Corrections
           </button>
         </div>
       </div>

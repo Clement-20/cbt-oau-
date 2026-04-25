@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { getRandomMotivation } from "../lib/motivations";
-import { Activity, Zap, ShieldCheck, Trophy, BookOpen, BellRing, Share2, Calculator } from "lucide-react";
+import { Activity, Zap, ShieldCheck, Trophy, BookOpen, BellRing, Share2, Calculator, Download, FileText, Upload } from "lucide-react";
 import { Link } from "react-router-dom";
 import { motion } from "motion/react";
 import { collection, onSnapshot, query, orderBy, limit } from "firebase/firestore";
@@ -197,9 +197,57 @@ export default function Home({ user, login, isLoggingIn }: { user: any, login?: 
         </div>
       )}
 
+      {/* Huge Clear Goal Buttons */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <Link 
+          to="/cbt" 
+          id="practice-mock-btn"
+          className="relative group overflow-hidden bg-blue-600 p-8 rounded-[2rem] text-white transition-all hover:scale-[1.02] active:scale-95 shadow-xl shadow-blue-500/20"
+        >
+          <div className="absolute -right-4 -bottom-4 opacity-10 group-hover:scale-110 transition-transform">
+            <Trophy size={160} />
+          </div>
+          <div className="relative z-10 space-y-2">
+            <BookOpen size={48} className="mb-4" />
+            <h2 className="text-3xl font-black tracking-tighter">Practice Mock</h2>
+            <p className="text-blue-100 font-medium opacity-80">Test your knowledge with real OAU CBT questions.</p>
+          </div>
+        </Link>
+
+        <Link 
+          to="/resources" 
+          id="download-pdf-btn"
+          className="relative group overflow-hidden bg-emerald-600 p-8 rounded-[2rem] text-white transition-all hover:scale-[1.02] active:scale-95 shadow-xl shadow-emerald-500/20"
+        >
+          <div className="absolute -right-4 -bottom-4 opacity-10 group-hover:scale-110 transition-transform">
+            <Download size={160} />
+          </div>
+          <div className="relative z-10 space-y-2">
+            <FileText size={48} className="mb-4" />
+            <h2 className="text-3xl font-black tracking-tighter">Download PDF</h2>
+            <p className="text-emerald-100 font-medium opacity-80">Access the largest vault of OAU study materials.</p>
+          </div>
+        </Link>
+
+        <Link 
+          to="/resources?upload=true"
+          id="upload-pdf-btn"
+          className="relative group overflow-hidden bg-zinc-900 dark:bg-zinc-800 p-8 rounded-[2rem] text-white transition-all hover:scale-[1.02] active:scale-95 shadow-xl shadow-black/20"
+        >
+          <div className="absolute -right-4 -bottom-4 opacity-10 group-hover:scale-110 transition-transform">
+            <Upload size={160} />
+          </div>
+          <div className="relative z-10 text-left space-y-2">
+            <Activity size={48} className="mb-4" />
+            <h2 className="text-3xl font-black tracking-tighter">Upload PDF</h2>
+            <p className="text-zinc-400 font-medium opacity-80">Help your fellow students. Share your materials.</p>
+          </div>
+        </Link>
+      </div>
+
       {/* Hero Section */}
       <div className="grid md:grid-cols-2 gap-6">
-        <div className="glass-panel p-5 md:p-8 rounded-3xl flex flex-col justify-between relative overflow-hidden">
+        <div className="glass-panel p-5 md:p-8 rounded-3xl flex flex-col justify-between relative overflow-hidden" id="nexus-hero">
           <div className="absolute top-0 right-0 p-4 opacity-5 dark:opacity-10 text-[var(--foreground)]">
             <BookOpen size={120} />
           </div>

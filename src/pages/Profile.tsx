@@ -2,7 +2,7 @@ import React, { useState, useEffect } from "react";
 import { doc, getDoc, updateDoc, collection, query, where, getDocs, count } from "firebase/firestore";
 import { handleFirestoreError, OperationType } from "../utils/errorHandling";
 import { db } from "../firebase";
-import { User, BadgeCheck, Upload, CreditCard, CheckCircle2, Loader2, Save, Flame, Clock, Target, Share2, ThumbsUp, Users, Twitter, Linkedin, ExternalLink, Star, FileText } from "lucide-react";
+import { User, BadgeCheck, Upload, CreditCard, CheckCircle2, Loader2, Save, Flame, Clock, Target, Share2, ThumbsUp, Users, Twitter, Linkedin, ExternalLink, Star, FileText, Download } from "lucide-react";
 import { Helmet } from "react-helmet-async";
 import { toast } from "../components/Toast";
 import { subscribeToSettings } from "../lib/settings";
@@ -19,10 +19,10 @@ export default function Profile({ user }: { user: any }) {
   const [saving, setSaving] = useState(false);
   const [isPaymentEnabled, setIsPaymentEnabled] = useState(true);
   
-  // Social Stats
   const [stats, setStats] = useState({
     uploads: 0,
     totalLikes: 0,
+    totalDownloads: 0,
     followers: 0
   });
 
@@ -50,21 +50,25 @@ export default function Profile({ user }: { user: any }) {
           setHighScoreCount(data.highScoreCount || 0);
         }
 
-        // Fetch Uploads & Likes
+        // Fetch Uploads, Likes & Downloads
         const resourcesQ = query(collection(db, "resources"), where("userId", "==", user.uid));
         const resourcesSnap = await getDocs(resourcesQ);
         let totalLikes = 0;
+        let totalDownloads = 0;
         resourcesSnap.forEach(doc => {
-          totalLikes += (doc.data().likes || 0);
+          const rData = doc.data();
+          totalLikes += (rData.likes || 0);
+          totalDownloads += (rData.downloads || 0);
         });
 
-        // Fetch Followers (Query users where followedUploaders contains user.uid)
+        // Fetch Followers
         const followersQ = query(collection(db, "users"), where("followedUploaders", "array-contains", user.uid));
         const followersSnap = await getDocs(followersQ);
 
         setStats({
           uploads: resourcesSnap.size,
           totalLikes,
+          totalDownloads,
           followers: followersSnap.size
         });
 
@@ -173,10 +177,11 @@ export default function Profile({ user }: { user: any }) {
       </div>
 
       {/* Social Stats Grid */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 sm:grid-cols-5 gap-4">
         {[
           { label: "Uploads", value: stats.uploads, icon: Upload, color: "text-blue-500" },
           { label: "Likes", value: stats.totalLikes, icon: ThumbsUp, color: "text-emerald-500" },
+          { label: "Downloads", value: stats.totalDownloads, icon: Download, color: "text-cyan-500" },
           { label: "Followers", value: stats.followers, icon: Users, color: "text-purple-500" },
           { label: "Following", value: followedUploaders.length, icon: Users, color: "text-amber-500" },
         ].map((stat, i) => (

@@ -24,7 +24,6 @@ export default function Community({ user }: { user: any }) {
   const scrollRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    if (!user) return;
     const fetchReviews = async () => {
       try {
         const q = query(collection(db, "community_reviews"), orderBy("timestamp", "desc"), limit(50));

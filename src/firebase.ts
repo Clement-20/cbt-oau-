@@ -1,32 +1,23 @@
 import { initializeApp, getApps, getApp } from 'firebase/app';
 import { getAuth, setPersistence, browserLocalPersistence } from 'firebase/auth';
-import { getFirestore, getDocFromServer, doc, enableIndexedDbPersistence } from 'firebase/firestore';
-import { getStorage } from 'firebase/storage';
+import { initializeFirestore, persistentLocalCache, persistentMultipleTabManager, getDocFromServer, doc } from 'firebase/firestore';
 import { getDatabase } from 'firebase/database';
 
 import firebaseConfig from '../firebase-applet-config.json';
 
 // Initialize Firebase SDK
 const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApp();
-export const db = getFirestore(app, firebaseConfig.firestoreDatabaseId);
 
-// Enable Offline Persistence for 35k+ multi-user scalability and bandwidth efficiency
-if (typeof window !== "undefined") {
-  enableIndexedDbPersistence(db).catch((err) => {
-    if (err.code === 'failed-precondition') {
-      console.warn("Firestore Persistence: Multiple tabs open. Persistence disabled for this tab.");
-    } else if (err.code === 'unimplemented') {
-      console.warn("Firestore Persistence: Browser doesn't support persistence.");
-    }
-  });
-}
+// Modern Firestore initialization with persistent local cache (replaces deprecated enableIndexedDbPersistence)
+export const db = initializeFirestore(app, {
+  localCache: persistentLocalCache({ tabManager: persistentMultipleTabManager() })
+}, firebaseConfig.firestoreDatabaseId);
 
 export const auth = getAuth(app);
 
 // Set browser local persistence so students stay logged in across sessions
 setPersistence(auth, browserLocalPersistence);
 
-export const storage = getStorage(app);
 export const rtdb = getDatabase(app);
 
 // Test connection to Firestore
@@ -47,7 +38,7 @@ async function testConnection() {
     
     console.group("Firebase Diagnosis");
     console.log("Project ID:", firebaseConfig.projectId);
-    console.log("Database ID:", databaseId);
+    console.log("Database ID:", firebaseConfig.firestoreDatabaseId);
     console.log("Auth Domain:", firebaseConfig.authDomain);
     console.log("Current App Domain:", window.location.hostname);
     if (isCustomDomain) {

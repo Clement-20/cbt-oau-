@@ -14,9 +14,9 @@ export default defineConfig(({mode}) => {
         registerType: 'autoUpdate',
         includeAssets: ['favicon.ico', 'apple-touch-icon.png', 'masked-icon.svg'],
         manifest: {
-          name: 'ICEPAB Nexus',
+          name: 'Digital Nexus',
           short_name: 'Nexus',
-          description: 'OAU Digital Nexus Application',
+          description: 'The ultimate OAU student super-app. Practice OAU CBT, access ePortal, and download study PDFs.',
           theme_color: '#2563eb',
           background_color: '#ffffff',
           display: 'standalone',

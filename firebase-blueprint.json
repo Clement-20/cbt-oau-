@@ -81,14 +81,33 @@
       "type": "object",
       "properties": {
         "title": { "type": "string" },
-        "type": { "type": "string", "enum": ["PDF", "Link"] },
+        "type": { "type": "string", "enum": ["PDF", "Image", "Note"] },
         "url": { "type": "string" },
         "course": { "type": "string" },
+        "department": { "type": "string" },
+        "level": { "type": "string" },
+        "category": { "type": "string" },
         "uploadedBy": { "type": "string" },
         "userId": { "type": "string" },
+        "uploaderVerified": { "type": "boolean" },
+        "validated": { "type": "boolean" },
+        "likes": { "type": "number" },
+        "dislikes": { "type": "number" },
+        "downloads": { "type": "number" },
+        "qualityScore": { "type": "number" },
         "timestamp": { "type": "string", "format": "date-time" }
       },
-      "required": ["title", "type", "url", "course", "uploadedBy", "userId"]
+      "required": ["title", "type", "url", "course", "uploadedBy", "userId", "department", "likes", "dislikes", "downloads"]
+    },
+    "UserCGPA": {
+      "title": "User CGPA",
+      "description": "Stores user courses and CGPA data",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "courses": { "type": "array" }
+      },
+      "required": ["userId"]
     },
     "CommunityReview": {
       "title": "Community Review",
@@ -145,6 +164,21 @@
         "timestamp": { "type": "string", "format": "date-time" }
       },
       "required": ["userId", "userEmail", "userName", "reference", "status"]
+    },
+    "Report": {
+      "title": "Report",
+      "description": "A report submitted by a user against a resource",
+      "type": "object",
+      "properties": {
+        "resourceId": { "type": "string" },
+        "resourceTitle": { "type": "string" },
+        "reason": { "type": "string" },
+        "reportedBy": { "type": "string" },
+        "reporterName": { "type": "string" },
+        "timestamp": { "type": "string", "format": "date-time" },
+        "status": { "type": "string", "enum": ["pending", "resolved"] }
+      },
+      "required": ["resourceId", "reason", "reportedBy", "timestamp", "status"]
     }
   },
   "firestore": {
@@ -172,6 +206,10 @@
       "schema": { "$ref": "#/entities/Resource" },
       "description": "Stores study resources"
     },
+    "/user_cgpa/{userId}": {
+      "schema": { "$ref": "#/entities/UserCGPA" },
+      "description": "Stores user courses and CGPA data"
+    },
     "/community_reviews/{reviewId}": {
       "schema": { "$ref": "#/entities/CommunityReview" },
       "description": "Stores community reviews"
@@ -187,6 +225,10 @@
     "/payment_verifications/{verificationId}": {
       "schema": { "$ref": "#/entities/PaymentVerification" },
       "description": "Stores student payment verification requests"
+    },
+    "/reports/{reportId}": {
+      "schema": { "$ref": "#/entities/Report" },
+      "description": "Stores user reports against resources"
     }
   }
 }

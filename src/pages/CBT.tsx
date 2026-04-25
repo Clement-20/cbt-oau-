@@ -498,12 +498,19 @@ export default function CBT({ user, dbUser, isFocusMode, setIsFocusMode }: { use
               <Activity size={20} className="text-blue-500" /> Topic Performance
             </h3>
             <div className="grid gap-3">
-              {Object.entries(topicStats).map(([topic, stats]) => {
+              {Object.entries(topicStats)
+                .sort((a, b) => (a[1].correct / a[1].total) - (b[1].correct / b[1].total))
+                .map(([topic, stats]) => {
                 const topicPerc = (stats.correct / stats.total) * 100;
                 return (
                   <div key={topic} className="bg-black/5 dark:bg-white/5 p-4 rounded-2xl border border-[var(--border)]">
                     <div className="flex justify-between items-center mb-2">
-                      <span className="font-bold text-sm">{topic}</span>
+                      <div className="flex items-center gap-2">
+                        <span className="font-bold text-sm">{topic}</span>
+                        {topicPerc < 40 && (
+                          <span className="text-[10px] bg-red-500/10 text-red-600 px-2 py-0.5 rounded-full font-black uppercase">Needs Review</span>
+                        )}
+                      </div>
                       <span className={clsx("text-xs font-black", topicPerc >= 70 ? "text-emerald-500" : topicPerc >= 40 ? "text-amber-500" : "text-red-500")}>
                         {stats.correct}/{stats.total} ({topicPerc.toFixed(0)}%)
                       </span>

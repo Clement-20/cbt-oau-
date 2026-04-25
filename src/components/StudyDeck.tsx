@@ -42,7 +42,7 @@ export default function StudyDeck({ user, onClose, contextText, initialPrompt }:
     if (!messageToSend || isLoading) return;
 
     if (!directPrompt) setInput("");
-    const newMessages = [...messages, { role: "user", text: messageToSend }];
+    const newMessages: Message[] = [...messages, { role: "user" as const, text: messageToSend }];
     setMessages(newMessages);
     setIsLoading(true);
 
