@@ -3,7 +3,6 @@ import { createServer as createViteServer } from "vite";
 import path from "path";
 import compression from "compression";
 import axios from "axios";
-import { createProxyMiddleware } from 'http-proxy-middleware';
 import { courses } from "./src/lib/questions";
 import * as dotenv from "dotenv";
 
@@ -20,33 +19,6 @@ async function startServer() {
   app.set("trust proxy", 1);
 
   const BASE_URL = process.env.VITE_BASE_URL || "https://oau.cbt.icepab.name.ng";
-
-  // Needed to resolve CORS issues with AI Studio Firebase Storage Buckets
-  
-  app.options('/proxy-storage/*', (req, res) => {
-    res.header('Access-Control-Allow-Origin', '*');
-    res.header('Access-Control-Allow-Methods', 'GET, PUT, POST, PATCH, DELETE, OPTIONS');
-    res.header('Access-Control-Allow-Headers', req.header('Access-Control-Request-Headers') || '*');
-    res.sendStatus(200);
-  });
-
-  app.use('/proxy-storage', createProxyMiddleware({
-    target: 'https://firebasestorage.googleapis.com',
-    changeOrigin: true,
-    pathRewrite: { '^/proxy-storage': '' },
-    on: {
-      proxyReq: (proxyReq) => {
-        proxyReq.removeHeader('origin');
-        proxyReq.removeHeader('referer');
-      },
-      proxyRes: (proxyRes) => {
-        proxyRes.headers['access-control-allow-origin'] = '*';
-        proxyRes.headers['access-control-allow-methods'] = 'GET, PUT, POST, PATCH, DELETE, OPTIONS';
-        proxyRes.headers['access-control-allow-headers'] = '*';
-        proxyRes.headers['access-control-expose-headers'] = '*';
-      }
-    }
-  }));
 
   app.use(compression());
   app.use(express.json());

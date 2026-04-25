@@ -29,39 +29,6 @@ setPersistence(auth, browserLocalPersistence);
 export const storage = getStorage(app);
 export const rtdb = getDatabase(app);
 
-// --- CORS WORKAROUND FOR AI STUDIO BUCKETS ---
-// This intercepts any request Firebase Storage tries to make and routes it
-// through our Express proxy to cleanly bypass browser CORS restrictions.
-if (typeof window !== "undefined") {
-  // Try to safely redefine fetch to get around property assignment restrictions
-  try {
-    const originalFetch = window.fetch;
-    Object.defineProperty(window, "fetch", {
-      value: async function () {
-        let args = Array.from(arguments) as [RequestInfo | URL, RequestInit?];
-        let resource = args[0];
-        if (typeof resource === 'string' && resource.startsWith('https://firebasestorage.googleapis.com')) {
-          args[0] = resource.replace('https://firebasestorage.googleapis.com', '/proxy-storage');
-        }
-        return originalFetch.apply(this, args as any);
-      },
-      configurable: true,
-      writable: true
-    });
-  } catch (e) {
-    console.warn("Could not patch window.fetch for CORS workaround", e);
-  }
-
-  const originalOpen = XMLHttpRequest.prototype.open;
-  XMLHttpRequest.prototype.open = function(method: string, url: string | URL) {
-    if (typeof url === 'string' && url.startsWith('https://firebasestorage.googleapis.com')) {
-      url = url.replace('https://firebasestorage.googleapis.com', '/proxy-storage');
-    }
-    return originalOpen.apply(this, arguments as any);
-  };
-}
-// ---------------------------------------------
-
 // Test connection to Firestore
 async function testConnection() {
   try {

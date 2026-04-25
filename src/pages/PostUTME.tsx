@@ -10,6 +10,7 @@ export default function PostUTME() {
   const [timeLeft, setTimeLeft] = useState(60 * 60);
   const [jambScore, setJambScore] = useState(0);
   const [submitted, setSubmitted] = useState(false);
+  const [showCorrections, setShowCorrections] = useState(false);
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
 
   const faculties = [
@@ -19,15 +20,18 @@ export default function PostUTME() {
   ];
 
   const activeQuestions = useMemo(() => {
-    if (!faculty) return [];
+    if (!faculty || !examStarted) return []; // Only generate pool once exam starts
     const selectedFaculty = faculties.find(f => f.name === faculty);
     if (!selectedFaculty) return [];
     let qs: Question[] = [];
     selectedFaculty.subjects.forEach(subj => {
-      qs = qs.concat(subjectQuestions[subj] || []);
+      // Shuffle the subject pool and take 10
+      const shuffled = [...(subjectQuestions[subj] || [])].sort(() => 0.5 - Math.random());
+      qs = qs.concat(shuffled.slice(0, 10));
     });
-    return qs;
-  }, [faculty]);
+    // Shuffle the final list of 40 questions
+    return qs.sort(() => 0.5 - Math.random());
+  }, [faculty, examStarted]);
 
   useEffect(() => {
     if (examStarted && timeLeft > 0 && !submitted) {
@@ -124,12 +128,70 @@ export default function PostUTME() {
             Note: OAU admission often uses 50% JAMB (Score / 8), 40% Post-UTME (40 marks), and 10% O’Level. This predictor assumes your 40-question score counts directly.
           </p>
         </div>
-        <button 
-          onClick={() => { setSubmitted(false); setExamStarted(false); setAnswers({}); setTimeLeft(60 * 60); setCurrentQuestionIndex(0); }}
-          className="bg-black/10 text-[var(--foreground)] px-8 py-4 rounded-2xl font-bold hover:bg-black/20 w-full"
-        >
-          Retake Mock
-        </button>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <button 
+            onClick={() => { setSubmitted(false); setShowCorrections(false); setExamStarted(false); setAnswers({}); setTimeLeft(60 * 60); setCurrentQuestionIndex(0); }}
+            className="bg-black/10 text-[var(--foreground)] px-8 py-4 rounded-2xl font-bold hover:bg-black/20 w-full"
+          >
+            Retake Mock
+          </button>
+          <button 
+            onClick={() => setShowCorrections(true)}
+            className="bg-cyan-600 text-white px-8 py-4 rounded-2xl font-bold hover:bg-cyan-700 w-full"
+          >
+            View Corrections
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  if (showCorrections) {
+    return (
+      <div className="max-w-4xl mx-auto p-4 pt-20 pb-24 md:pb-8 space-y-6">
+        <div className="flex justify-between items-center bg-black/5 p-4 rounded-2xl">
+          <h2 className="font-black text-2xl">Mock Test Corrections</h2>
+          <button 
+            onClick={() => setShowCorrections(false)}
+            className="px-4 py-2 bg-black/10 rounded-xl font-bold hover:bg-black/20"
+          >
+            Back to Result
+          </button>
+        </div>
+        <div className="space-y-6">
+          {activeQuestions.map((q, idx) => {
+            const userAnswer = answers[q.id];
+            const isCorrect = userAnswer === q.correctAnswer;
+            
+            return (
+              <div key={q.id} className="glass-panel p-6 rounded-3xl space-y-4">
+                <div className="flex justify-between items-center text-sm font-bold opacity-60">
+                    <span className="bg-cyan-500/20 text-cyan-600 dark:text-cyan-400 px-3 py-1 rounded-full">{q.subject}</span>
+                    <span className={isCorrect ? 'text-green-500' : 'text-red-500'}>
+                      {isCorrect ? 'Correct +1' : 'Wrong 0'}
+                    </span>
+                </div>
+                <h3 className="text-xl font-bold">{idx + 1}. {q.question}</h3>
+                <div className="space-y-2">
+                  {q.options.map((option, i) => {
+                    let className = "w-full text-left p-4 rounded-2xl border-2 transition-all opacity-50 border-transparent bg-black/5";
+                    if (i === q.correctAnswer) {
+                      className = "w-full text-left p-4 rounded-2xl border-2 border-green-500 bg-green-500/20 font-bold";
+                    } else if (i === userAnswer) {
+                      className = "w-full text-left p-4 rounded-2xl border-2 border-red-500 bg-red-500/20";
+                    }
+                    return (
+                      <div key={i} className={className}>
+                        <span className="inline-block w-8 font-bold opacity-50">{['A', 'B', 'C', 'D'][i]}.</span> 
+                        {option}
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            );
+          })}
+        </div>
       </div>
     );
   }
