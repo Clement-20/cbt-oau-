@@ -114,7 +114,96 @@ export default function PostUTME() {
     );
   }
 
-  if (submitted) {
+  if (showCorrections) {
+    return (
+      <div className="max-w-4xl mx-auto p-4 pt-20 pb-24 md:pb-8 space-y-6">
+        <div className="flex justify-between items-center bg-black/5 p-4 rounded-2xl">
+          <h2 className="font-black text-2xl">Mock Test Corrections</h2>
+          <button 
+            onClick={() => setShowCorrections(false)}
+            className="px-4 py-2 bg-black/10 rounded-xl font-bold hover:bg-black/20"
+          >
+            Back to Result
+          </button>
+        </div>
+        <div className="space-y-6">
+          {activeQuestions.map((q, idx) => {
+            const userAnswer = answers[q.id];
+            const isCorrect = userAnswer === q.correctAnswer;
+            const isExplaining = explainQuestionId === q.id;
+            
+            return (
+              <div key={q.id} className="glass-panel p-6 rounded-3xl space-y-4">
+                <div className="flex justify-between items-center text-sm font-bold opacity-60">
+                    <span className="bg-cyan-500/20 text-cyan-600 dark:text-cyan-400 px-3 py-1 rounded-full">{q.subject}</span>
+                    <span className={isCorrect ? 'text-green-500' : 'text-red-500'}>
+                      {isCorrect ? 'Correct +1' : 'Wrong 0'}
+                    </span>
+                </div>
+                <h3 className="text-xl font-bold">{idx + 1}. {q.question}</h3>
+                
+                {!isCorrect && (
+                   <div className="bg-red-500/10 border border-red-500/20 p-4 rounded-2xl mb-4">
+                      {userAnswer === undefined ? (
+                         <p className="text-amber-500 font-bold">You skipped this question.</p>
+                      ) : (
+                         <p className="text-red-500 font-bold line-through">Your Answer: {q.options[userAnswer]}</p>
+                      )}
+                      <p className="text-green-500 font-bold mt-2 flex items-center gap-2">
+                        <Award size={18} /> Correct Answer: {q.options[q.correctAnswer]}
+                      </p>
+                   </div>
+                )}
+                
+                <div className="space-y-2">
+                  {q.options.map((option, i) => {
+                    let className = "w-full text-left p-4 rounded-2xl border-2 transition-all border-transparent bg-black/5";
+                    if (i === q.correctAnswer) {
+                      className = "w-full text-left p-4 rounded-2xl border-2 border-green-500 bg-green-500/20 font-bold text-green-700 dark:text-green-400";
+                    } else if (i === userAnswer) {
+                      className = "w-full text-left p-4 rounded-2xl border-2 border-red-500 bg-red-500/20 text-red-700 dark:text-red-400 opacity-70";
+                    } else {
+                      className += " opacity-50";
+                    }
+                    return (
+                      <div key={i} className={className}>
+                        <span className="inline-block w-8 font-bold opacity-70">{['A', 'B', 'C', 'D'][i]}.</span> 
+                        {option}
+                      </div>
+                    );
+                  })}
+                </div>
+
+                {!isCorrect && !isExplaining && (
+                  <button 
+                    onClick={() => setExplainQuestionId(q.id)}
+                    className="mt-4 px-6 py-3 rounded-xl font-bold bg-cyan-600/20 hover:bg-cyan-600/40 text-cyan-400 transition-colors flex items-center gap-2 text-sm"
+                  >
+                    <BrainCircuit size={18} /> Explain with AI Tutor
+                  </button>
+                )}
+
+                {isExplaining && (
+                  <div className="mt-6 pt-6 border-t border-white/10">
+                      <AITutor 
+                        question={q.question}
+                        options={q.options}
+                        correctAnswer={q.options[q.correctAnswer]}
+                        isVerified={auth.currentUser?.emailVerified || false}
+                        isVisible={true}
+                        autoExplain={true}
+                      />
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    );
+  }
+
+  if (submitted && !showCorrections) {
     const subjectStats: Record<string, { correct: number, total: number }> = {};
     const topicStats: Record<string, { correct: number, total: number }> = {};
 
@@ -257,95 +346,6 @@ export default function PostUTME() {
           >
             View Review & Corrections
           </button>
-        </div>
-      </div>
-    );
-  }
-
-  if (showCorrections) {
-    return (
-      <div className="max-w-4xl mx-auto p-4 pt-20 pb-24 md:pb-8 space-y-6">
-        <div className="flex justify-between items-center bg-black/5 p-4 rounded-2xl">
-          <h2 className="font-black text-2xl">Mock Test Corrections</h2>
-          <button 
-            onClick={() => setShowCorrections(false)}
-            className="px-4 py-2 bg-black/10 rounded-xl font-bold hover:bg-black/20"
-          >
-            Back to Result
-          </button>
-        </div>
-        <div className="space-y-6">
-          {activeQuestions.map((q, idx) => {
-            const userAnswer = answers[q.id];
-            const isCorrect = userAnswer === q.correctAnswer;
-            const isExplaining = explainQuestionId === q.id;
-            
-            return (
-              <div key={q.id} className="glass-panel p-6 rounded-3xl space-y-4">
-                <div className="flex justify-between items-center text-sm font-bold opacity-60">
-                    <span className="bg-cyan-500/20 text-cyan-600 dark:text-cyan-400 px-3 py-1 rounded-full">{q.subject}</span>
-                    <span className={isCorrect ? 'text-green-500' : 'text-red-500'}>
-                      {isCorrect ? 'Correct +1' : 'Wrong 0'}
-                    </span>
-                </div>
-                <h3 className="text-xl font-bold">{idx + 1}. {q.question}</h3>
-                
-                {!isCorrect && (
-                   <div className="bg-red-500/10 border border-red-500/20 p-4 rounded-2xl mb-4">
-                      {userAnswer === undefined ? (
-                         <p className="text-amber-500 font-bold">You skipped this question.</p>
-                      ) : (
-                         <p className="text-red-500 font-bold line-through">Your Answer: {q.options[userAnswer]}</p>
-                      )}
-                      <p className="text-green-500 font-bold mt-2 flex items-center gap-2">
-                        <Award size={18} /> Correct Answer: {q.options[q.correctAnswer]}
-                      </p>
-                   </div>
-                )}
-                
-                <div className="space-y-2">
-                  {q.options.map((option, i) => {
-                    let className = "w-full text-left p-4 rounded-2xl border-2 transition-all border-transparent bg-black/5";
-                    if (i === q.correctAnswer) {
-                      className = "w-full text-left p-4 rounded-2xl border-2 border-green-500 bg-green-500/20 font-bold text-green-700 dark:text-green-400";
-                    } else if (i === userAnswer) {
-                      className = "w-full text-left p-4 rounded-2xl border-2 border-red-500 bg-red-500/20 text-red-700 dark:text-red-400 opacity-70";
-                    } else {
-                      className += " opacity-50";
-                    }
-                    return (
-                      <div key={i} className={className}>
-                        <span className="inline-block w-8 font-bold opacity-70">{['A', 'B', 'C', 'D'][i]}.</span> 
-                        {option}
-                      </div>
-                    );
-                  })}
-                </div>
-
-                {!isCorrect && !isExplaining && (
-                  <button 
-                    onClick={() => setExplainQuestionId(q.id)}
-                    className="mt-4 px-6 py-3 rounded-xl font-bold bg-cyan-600/20 hover:bg-cyan-600/40 text-cyan-400 transition-colors flex items-center gap-2 text-sm"
-                  >
-                    <BrainCircuit size={18} /> Explain with AI Tutor
-                  </button>
-                )}
-
-                {isExplaining && (
-                  <div className="mt-6 pt-6 border-t border-white/10">
-                      <AITutor 
-                        question={q.question}
-                        options={q.options}
-                        correctAnswer={q.options[q.correctAnswer]}
-                        isVerified={auth.currentUser?.emailVerified || false}
-                        isVisible={true}
-                        autoExplain={true}
-                      />
-                  </div>
-                )}
-              </div>
-            );
-          })}
         </div>
       </div>
     );
