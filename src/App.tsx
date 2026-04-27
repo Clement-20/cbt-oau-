@@ -8,7 +8,7 @@ import { onAuthStateChanged, signInWithPopup, GoogleAuthProvider, signOut, brows
 import { auth, db } from "./firebase";
 import { doc, getDoc, setDoc, updateDoc, serverTimestamp } from "firebase/firestore";
 import { handleFirestoreError, OperationType } from "./utils/errorHandling";
-import { LogIn, LogOut, ShieldAlert, Sun, Moon, Calculator, Share2, Menu, X, User, Flame, Loader2, Zap, HelpCircle, MessageSquare } from "lucide-react";
+import { LogIn, LogOut, ShieldAlert, Sun, Moon, Calculator, Share2, Menu, X, User, Flame, Loader2, Zap, HelpCircle, MessageSquare, MessageCircle } from "lucide-react";
 import { clsx } from "clsx";
 import NexusBadge from "./components/NexusBadge";
 import Toast from "./components/Toast";

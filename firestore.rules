@@ -140,7 +140,7 @@ service cloud.firestore {
       allow update: if isAdmin();
     }
 
-    // 7. Admin Collections
+    // 9. Admin Collections
     match /broadcasts/{broadcastId} {
       allow read: if true;
       allow write: if isAdmin();

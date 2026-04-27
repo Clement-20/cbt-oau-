@@ -79,6 +79,7 @@ export default function ResourceMarketplace({ user, isAdmin }: { user?: any, isA
   const isUserAdmin = user?.email === "banmekeifeoluwa@gmail.com";
   const { followedUploaders, likedResources, dislikedResources, favoriteResources, followUploader, unfollowUploader, toggleLike, toggleDislike, toggleFavorite } = useAcademicStore();
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const isSubmittingRef = useRef(false);
   const location = useLocation();
 
   // Handle upload=true from query params
@@ -233,48 +234,58 @@ export default function ResourceMarketplace({ user, isAdmin }: { user?: any, isA
 
   const handleUpload = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (isSubmittingRef.current) return;
+    
     if (!user) {
       toast("Please sign in to upload resources");
       return;
     }
 
+    isSubmittingRef.current = true;
     const canUpload = await checkUploadLimit(user.uid);
-    if (!canUpload && !isAdmin) {
-      toast("Daily Nexus Security: You've reached your limit of 3 uploads per hour. Take a break! 🛡️");
-      return;
-    }
+      if (!canUpload && !isAdmin) {
+        toast("Daily Nexus Security: You've reached your limit of 3 uploads per hour. Take a break! 🛡️");
+        isSubmittingRef.current = false;
+        return;
+      }
 
-    if (!isVerifiedUser && !isAdmin) {
-      toast("Only verified users can upload resources. Visit Profile to get verified.");
-      return;
-    }
-    if (!newResource.title || !newResource.course || !newResource.department) {
-      toast("Please fill all required fields including Department");
-      return;
-    }
-    if (!selectedFile) {
-      toast(`Please select a file to upload`);
-      return;
-    }
+      if (!isVerifiedUser && !isAdmin) {
+        toast("Only verified users can upload resources. Visit Profile to get verified.");
+        isSubmittingRef.current = false;
+        return;
+      }
+      if (!newResource.title || !newResource.course || !newResource.department) {
+        toast("Please fill all required fields including Department");
+        isSubmittingRef.current = false;
+        return;
+      }
+      if (!selectedFile) {
+        toast(`Please select a file to upload`);
+        isSubmittingRef.current = false;
+        return;
+      }
 
-    const allowedExtensions = ['.pdf', '.docx'];
-    const fileName = selectedFile.name.toLowerCase();
-    const isValidExtension = allowedExtensions.some(ext => fileName.endsWith(ext));
+      const allowedExtensions = ['.pdf', '.docx'];
+      const fileName = selectedFile.name.toLowerCase();
+      const isValidExtension = allowedExtensions.some(ext => fileName.endsWith(ext));
 
-    if (!isValidExtension) {
-      toast("Invalid file. Only .pdf and .docx extensions are allowed. 🛡️");
-      return;
-    }
+      if (!isValidExtension) {
+        toast("Invalid file. Only .pdf and .docx extensions are allowed. 🛡️");
+        isSubmittingRef.current = false;
+        return;
+      }
 
-    if (selectedFile.size > 10 * 1024 * 1024) {
-      toast("Validation failed: File size exceeds the 10MB limit. 🛡️");
-      return;
-    }
+      if (selectedFile.size > 10 * 1024 * 1024) {
+        toast("Validation failed: File size exceeds the 10MB limit. 🛡️");
+        isSubmittingRef.current = false;
+        return;
+      }
 
-    setIsUploading(true);
-    setUploadProgress(0);
-    try {
-      // Duplicate check
+      setIsUploading(true);
+      setUploadProgress(0);
+      
+      try {
+        // Duplicate check
       const fileHash = await calculateHash(selectedFile);
       const duplicateQuery = query(collection(db, "resources"), where("fileHash", "==", fileHash));
       const duplicateSnap = await getDocs(duplicateQuery);
@@ -361,6 +372,7 @@ export default function ResourceMarketplace({ user, isAdmin }: { user?: any, isA
       toast("Upload failed. Security rules might have blocked the request.");
     } finally {
       setIsUploading(false);
+      isSubmittingRef.current = false;
     }
   };
 
