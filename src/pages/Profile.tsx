@@ -6,11 +6,17 @@ import { User, BadgeCheck, Upload, CreditCard, CheckCircle2, Loader2, Save, Flam
 import { Helmet } from "react-helmet-async";
 import { toast } from "../components/Toast";
 import { subscribeToSettings } from "../lib/settings";
-import { Link } from "react-router-dom";
+import { Link, useParams } from "react-router-dom";
 import { useAcademicStore } from "../lib/academicStore";
 
 export default function Profile({ user }: { user: any }) {
+  const { id } = useParams<{ id: string }>();
+  const targetId = id || user?.uid;
+  const isOwnProfile = !id || id === user?.uid;
+
   const [displayName, setDisplayName] = useState("");
+  const [profileEmail, setProfileEmail] = useState("");
+  const [profilePhoto, setProfilePhoto] = useState("");
   const [isVerified, setIsVerified] = useState(false);
   const [isShana, setIsShana] = useState(false);
   const [cbtTimeSpent, setCbtTimeSpent] = useState(0);
@@ -23,7 +29,8 @@ export default function Profile({ user }: { user: any }) {
     uploads: 0,
     totalLikes: 0,
     totalDownloads: 0,
-    followers: 0
+    followers: 0,
+    following: 0
   });
 
   const { followedUploaders, favoriteResources } = useAcademicStore();
@@ -31,7 +38,10 @@ export default function Profile({ user }: { user: any }) {
   const [loadingFavorites, setLoadingFavorites] = useState(false);
 
   useEffect(() => {
-    if (!user) return;
+    if (!targetId) {
+      setLoading(false);
+      return;
+    }
     
     const unsubscribeSettings = subscribeToSettings((s) => {
       setIsPaymentEnabled(s.isPaymentEnabled);
@@ -40,47 +50,53 @@ export default function Profile({ user }: { user: any }) {
     const fetchProfileData = async () => {
       try {
         // Fetch User Doc
-        const userSnap = await getDoc(doc(db, "users", user.uid));
+        const userSnap = await getDoc(doc(db, "users", targetId));
         if (userSnap.exists()) {
           const data = userSnap.data();
           setDisplayName(data.displayName || "");
+          setProfileEmail(data.email || "");
+          setProfilePhoto(data.photoURL || "");
           setIsVerified(data.isVerified || false);
           setIsShana(data.isShana || false);
           setCbtTimeSpent(data.cbtTimeSpent || 0);
           setHighScoreCount(data.highScoreCount || 0);
+          
+          const followingCount = data.followedUploaders ? data.followedUploaders.length : 0;
+          
+          // Fetch Uploads, Likes & Downloads
+          const resourcesQ = query(collection(db, "resources"), where("userId", "==", targetId));
+          const resourcesSnap = await getDocs(resourcesQ);
+          let totalLikes = 0;
+          let totalDownloads = 0;
+          resourcesSnap.forEach(doc => {
+            const rData = doc.data();
+            totalLikes += (rData.likes || 0);
+            totalDownloads += (rData.downloads || 0);
+          });
+
+          // Fetch Followers
+          const followersQ = query(collection(db, "users"), where("followedUploaders", "array-contains", targetId));
+          const followersSnap = await getDocs(followersQ);
+
+          setStats({
+            uploads: resourcesSnap.size,
+            totalLikes,
+            totalDownloads,
+            followers: followersSnap.size,
+            following: followingCount
+          });
         }
 
-        // Fetch Uploads, Likes & Downloads
-        const resourcesQ = query(collection(db, "resources"), where("userId", "==", user.uid));
-        const resourcesSnap = await getDocs(resourcesQ);
-        let totalLikes = 0;
-        let totalDownloads = 0;
-        resourcesSnap.forEach(doc => {
-          const rData = doc.data();
-          totalLikes += (rData.likes || 0);
-          totalDownloads += (rData.downloads || 0);
-        });
-
-        // Fetch Followers
-        const followersQ = query(collection(db, "users"), where("followedUploaders", "array-contains", user.uid));
-        const followersSnap = await getDocs(followersQ);
-
-        setStats({
-          uploads: resourcesSnap.size,
-          totalLikes,
-          totalDownloads,
-          followers: followersSnap.size
-        });
-
       } catch (error) {
-        handleFirestoreError(error, OperationType.GET, `users/${user.uid}`);
+        handleFirestoreError(error, OperationType.GET, `users/${targetId}`);
       } finally {
         setLoading(false);
       }
     };
 
     const fetchFavorites = async () => {
-      if (favoriteResources.length === 0) {
+      // Only fetch favorites if viewing own profile, as others' favorites are not easily accessible without changing data model
+      if (!isOwnProfile || favoriteResources.length === 0) {
         setFavoriteMaterials([]);
         return;
       }
@@ -103,10 +119,10 @@ export default function Profile({ user }: { user: any }) {
     return () => {
       unsubscribeSettings();
     };
-  }, [user, favoriteResources]);
+  }, [targetId, favoriteResources, isOwnProfile]);
 
   const handleSaveProfile = async () => {
-    if (!user || !displayName.trim()) return;
+    if (!user || !displayName.trim() || !isOwnProfile) return;
     setSaving(true);
     try {
       const docRef = doc(db, "users", user.uid);
@@ -120,8 +136,8 @@ export default function Profile({ user }: { user: any }) {
     }
   };
 
-  if (!user) {
-    return <div className="text-center py-20 text-[var(--foreground)]/60 font-medium">Sign in to access your profile.</div>;
+  if (!targetId) {
+    return <div className="text-center py-20 text-[var(--foreground)]/60 font-medium">Sign in to access this profile.</div>;
   }
 
   if (loading) {
@@ -131,8 +147,8 @@ export default function Profile({ user }: { user: any }) {
   return (
     <div className="max-w-2xl mx-auto space-y-8 pb-20">
       <Helmet>
-        <title>Profile | Digital Nexus</title>
-        <meta name="description" content="Manage your Digital Nexus profile and verification status." />
+        <title>{displayName ? `${displayName}'s Profile` : 'Profile'} | Digital Nexus</title>
+        <meta name="description" content="View this Digital Nexus profile." />
       </Helmet>
 
       {/* Profile Header */}
@@ -141,7 +157,7 @@ export default function Profile({ user }: { user: any }) {
         <div className="px-8 -mt-12 flex flex-col sm:flex-row items-end gap-6">
           <div className="relative">
             <img 
-              src={user.photoURL || `https://api.dicebear.com/7.x/avataaars/svg?seed=${user.uid}`} 
+              src={profilePhoto || `https://api.dicebear.com/7.x/avataaars/svg?seed=${targetId}`} 
               alt={displayName} 
               className="w-32 h-32 rounded-[40px] border-4 border-[var(--background)] bg-[var(--background)] shadow-xl"
             />
@@ -156,16 +172,16 @@ export default function Profile({ user }: { user: any }) {
               {displayName || "Student"}
               {isVerified && <span className="text-xs bg-blue-500/10 text-blue-600 px-3 py-1 rounded-full uppercase tracking-widest font-black">ICEPAB Scholar</span>}
             </h1>
-            <p className="text-[var(--foreground)]/50 font-bold text-sm tracking-tight">{user.email}</p>
+            {isOwnProfile && <p className="text-[var(--foreground)]/50 font-bold text-sm tracking-tight">{profileEmail}</p>}
           </div>
           <button 
             onClick={() => {
-              const text = `Check out my student profile on Digital Nexus! ${isShana ? "I'm a Certified Shana! 🔥" : ""} ${isVerified ? "I'm Verified! ✅" : ""}`;
+              const text = `Check out ${displayName}'s profile on Digital Nexus! ${isShana ? "Certified Shana! 🔥" : ""} ${isVerified ? "Verified! ✅" : ""}`;
               window.dispatchEvent(new CustomEvent("open-share-modal", {
                 detail: {
                   title: `${displayName}'s Profile`,
                   text: text,
-                  url: window.location.origin
+                  url: window.location.origin + `/profile/${targetId}`
                 }
               }));
             }}
@@ -183,7 +199,7 @@ export default function Profile({ user }: { user: any }) {
           { label: "Likes", value: stats.totalLikes, icon: ThumbsUp, color: "text-emerald-500" },
           { label: "Downloads", value: stats.totalDownloads, icon: Download, color: "text-cyan-500" },
           { label: "Followers", value: stats.followers, icon: Users, color: "text-purple-500" },
-          { label: "Following", value: followedUploaders.length, icon: Users, color: "text-amber-500" },
+          { label: "Following", value: stats.following, icon: Users, color: "text-amber-500" },
         ].map((stat, i) => (
           <div key={i} className="glass-panel p-4 rounded-3xl text-center border border-[var(--border)]">
             <div className={`w-10 h-10 rounded-2xl bg-black/5 dark:bg-white/5 flex items-center justify-center mx-auto mb-2 ${stat.color}`}>
@@ -196,6 +212,7 @@ export default function Profile({ user }: { user: any }) {
       </div>
 
       {/* Profile Edit Section */}
+      {isOwnProfile && (
       <div className="glass-panel p-8 rounded-[40px] shadow-sm space-y-6">
         <h2 className="text-2xl font-black tracking-tighter flex items-center gap-2">
           Profile Settings
@@ -233,9 +250,10 @@ export default function Profile({ user }: { user: any }) {
           </div>
         </div>
       </div>
+      )}
 
       {/* Verification Section */}
-      {isPaymentEnabled && (
+      {isOwnProfile && isPaymentEnabled && (
         <div className="glass-panel p-8 rounded-[40px] shadow-sm space-y-6 relative overflow-hidden border-2 border-blue-500/20">
           <div className="absolute -top-12 -right-12 w-48 h-48 bg-blue-600/10 rounded-full blur-3xl"></div>
           

@@ -513,6 +513,7 @@ function MainApp() {
             <Route path="/gpa" element={<GPA user={user} />} />
             <Route path="/aro" element={<Aro user={user} />} />
             <Route path="/profile" element={<Profile user={user} />} />
+            <Route path="/profile/:id" element={<Profile user={user} />} />
             <Route path="/setup" element={<Setup user={user} dbUser={dbUser} setDbUser={setDbUser} />} />
             <Route path="/about" element={<About />} />
             <Route path="/community" element={<Community user={user} />} />

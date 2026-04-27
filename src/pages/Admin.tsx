@@ -19,6 +19,7 @@ export default function Admin({ user }: { user: any }) {
 
   const [unverifiedUsers, setUnverifiedUsers] = useState<any[]>([]);
   const [paymentVerifications, setPaymentVerifications] = useState<any[]>([]);
+  const [pendingResources, setPendingResources] = useState<any[]>([]);
   const [queueLoading, setQueueLoading] = useState(true);
 
   const [contentSearch, setContentSearch] = useState("");
@@ -34,9 +35,10 @@ export default function Admin({ user }: { user: any }) {
 
     const fetchQueue = async () => {
       try {
-        const [usersSnap, paymentsSnap] = await Promise.all([
+        const [usersSnap, paymentsSnap, resourcesSnap] = await Promise.all([
           getDocs(query(collection(db, "users"), where("isVerified", "==", false), limit(20))),
-          getDocs(query(collection(db, "payment_verifications"), where("status", "==", "pending"), limit(20)))
+          getDocs(query(collection(db, "payment_verifications"), where("status", "==", "pending"), limit(20))),
+          getDocs(query(collection(db, "resources"), where("validated", "==", false), limit(20)))
         ]);
         
         const users: any[] = [];
@@ -50,8 +52,9 @@ export default function Admin({ user }: { user: any }) {
         });
         setUnverifiedUsers(users);
         setPaymentVerifications(paymentsSnap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+        setPendingResources(resourcesSnap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
       } catch (error) {
-        handleFirestoreError(error, OperationType.GET, "users/payment_verifications");
+        handleFirestoreError(error, OperationType.GET, "users/payment_verifications/resources");
       } finally {
         setQueueLoading(false);
       }
@@ -91,6 +94,29 @@ export default function Admin({ user }: { user: any }) {
     } catch (error) {
       handleFirestoreError(error, OperationType.UPDATE, `payment_verifications/${paymentId}`);
       toast("Failed to verify payment.");
+    }
+  };
+
+  const approveResource = async (resourceId: string) => {
+    try {
+      const resourceRef = doc(db, "resources", resourceId);
+      await updateDoc(resourceRef, { validated: true });
+      setPendingResources(prev => prev.filter(r => r.id !== resourceId));
+      toast("Resource approved and published!");
+    } catch (error) {
+      handleFirestoreError(error, OperationType.UPDATE, `resources/${resourceId}`);
+      toast("Failed to approve resource.");
+    }
+  };
+
+  const rejectResource = async (resourceId: string) => {
+    try {
+      await deleteDoc(doc(db, "resources", resourceId));
+      setPendingResources(prev => prev.filter(r => r.id !== resourceId));
+      toast("Resource rejected and deleted.");
+    } catch (error) {
+      handleFirestoreError(error, OperationType.DELETE, `resources/${resourceId}`);
+      toast("Failed to reject resource.");
     }
   };
 
@@ -377,7 +403,7 @@ export default function Admin({ user }: { user: any }) {
             
             {paymentVerifications.length > 0 && (
               <div className="overflow-x-auto">
-                <h3 className="text-lg font-bold mb-4">Payment Verifications</h3>
+                <h3 className="text-lg font-bold mb-4 mt-6">Payment Verifications</h3>
                 <table className="w-full text-left border-collapse">
                   <thead>
                     <tr className="bg-black/5 dark:bg-white/5 text-xs font-bold text-[var(--foreground)]/50 uppercase tracking-widest border-b border-[var(--border)]">
@@ -394,6 +420,48 @@ export default function Admin({ user }: { user: any }) {
                         <td className="p-4 text-right">
                           <button 
                             onClick={() => approvePayment(p.id, p.userId)}
+                            className="bg-emerald-600 hover:bg-emerald-500 text-white px-4 py-2 rounded-lg text-sm font-bold transition-colors shadow-sm inline-flex items-center gap-2"
+                          >
+                            <CheckCircle size={16} /> Approve
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+
+            {pendingResources.length > 0 && (
+              <div className="overflow-x-auto mt-6">
+                <h3 className="text-lg font-bold mb-4">Pending Vault Resources</h3>
+                <table className="w-full text-left border-collapse">
+                  <thead>
+                    <tr className="bg-black/5 dark:bg-white/5 text-xs font-bold text-[var(--foreground)]/50 uppercase tracking-widest border-b border-[var(--border)]">
+                      <th className="p-4">Resource Info</th>
+                      <th className="p-4">Uploaded By</th>
+                      <th className="p-4 text-right">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-[var(--border)]">
+                    {pendingResources.map((r) => (
+                      <tr key={r.id} className="hover:bg-black/5 dark:hover:bg-white/5 transition-colors">
+                        <td className="p-4">
+                           <div className="font-bold flex items-center gap-2">
+                             {r.course} <span className="opacity-50 text-xs font-normal">| {r.type}</span>
+                           </div>
+                           <a href={r.url} target="_blank" rel="noopener noreferrer" className="text-sm font-medium text-cyan-600 hover:underline">{r.title}</a>
+                        </td>
+                        <td className="p-4 text-sm opacity-80">{r.uploadedBy}</td>
+                        <td className="p-4 text-right space-x-2">
+                          <button 
+                            onClick={() => rejectResource(r.id)}
+                            className="bg-red-500/10 hover:bg-red-500 text-red-500 hover:text-white px-3 py-2 rounded-lg text-sm font-bold transition-colors shadow-sm inline-flex items-center gap-2"
+                          >
+                            <Trash2 size={16} />
+                          </button>
+                          <button 
+                            onClick={() => approveResource(r.id)}
                             className="bg-emerald-600 hover:bg-emerald-500 text-white px-4 py-2 rounded-lg text-sm font-bold transition-colors shadow-sm inline-flex items-center gap-2"
                           >
                             <CheckCircle size={16} /> Approve

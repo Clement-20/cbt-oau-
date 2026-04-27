@@ -1,40 +1,45 @@
 import React, { useEffect, useState } from "react";
-import { collection, query, orderBy, limit, getDocs } from "firebase/firestore";
+import { collection, query, orderBy, limit, getDocs, doc, getDoc } from "firebase/firestore";
 import { handleFirestoreError, OperationType } from "../utils/errorHandling";
 import { db } from "../firebase";
 import { Trophy, Medal, Award, Flame, Share2 } from "lucide-react";
 import NexusBadge from "../components/NexusBadge";
 import { Helmet } from "react-helmet-async";
+import { Link } from "react-router-dom";
 
 const LeaderboardRow = React.memo(({ leader, index }: { leader: any, index: number }) => {
   return (
-    <div className="grid grid-cols-12 gap-4 p-5 items-center hover:bg-black/5 dark:hover:bg-white/5 transition-colors">
-      <div className="col-span-2 flex justify-center">
-        {index === 0 ? <Trophy className="text-yellow-500 drop-shadow-md" size={28} /> :
-         index === 1 ? <Medal className="text-slate-400 drop-shadow-md" size={28} /> :
-         index === 2 ? <Award className="text-amber-700 drop-shadow-md" size={28} /> :
-         <span className="font-mono text-lg font-bold text-[var(--foreground)]/30">#{index + 1}</span>}
-      </div>
-      <div className="col-span-6 flex items-center gap-4">
-        <img src={leader.photoURL || `https://api.dicebear.com/7.x/avataaars/svg?seed=${leader.uid}`} alt={leader.displayName} loading="lazy" decoding="async" className="w-12 h-12 rounded-full border border-[var(--border)] shadow-sm" />
-        <div>
-          <div className="font-bold text-base flex items-center gap-1">
-            {leader.displayName}
-            <NexusBadge isVerified={leader.isVerified} badgeType={leader.badgeType} isShana={leader.isShana} />
+    <Link to={`/profile/${leader.id}`} className="block block group cursor-pointer">
+      <div className="grid grid-cols-12 gap-4 p-5 items-center hover:bg-black/5 dark:hover:bg-white/5 transition-colors border-b border-[var(--border)] last:border-0">
+        <div className="col-span-2 flex justify-center">
+          {index === 0 ? <Trophy className="text-yellow-500 drop-shadow-md group-hover:scale-110 transition-transform" size={28} /> :
+           index === 1 ? <Medal className="text-slate-400 drop-shadow-md group-hover:scale-110 transition-transform" size={28} /> :
+           index === 2 ? <Award className="text-amber-700 drop-shadow-md group-hover:scale-110 transition-transform" size={28} /> :
+           <span className="font-mono text-lg font-bold text-[var(--foreground)]/30 group-hover:text-[var(--foreground)]/50 transition-colors">#{index + 1}</span>}
+        </div>
+        <div className="col-span-6 flex items-center gap-4">
+          <img src={leader.photoURL || `https://api.dicebear.com/7.x/avataaars/svg?seed=${leader.uid}`} alt={leader.displayName} loading="lazy" decoding="async" className="w-12 h-12 rounded-full border border-[var(--border)] shadow-sm group-hover:ring-2 group-hover:ring-blue-500 transition-all" />
+          <div>
+            <div className="font-bold text-base flex items-center gap-1 group-hover:text-blue-500 transition-colors">
+              {leader.displayName}
+              <NexusBadge isVerified={leader.isVerified} badgeType={leader.badgeType} isShana={leader.isShana} />
+            </div>
+            <div className="text-xs font-medium text-[var(--foreground)]/50 uppercase tracking-wider">{leader.role}</div>
           </div>
-          <div className="text-xs font-medium text-[var(--foreground)]/50 uppercase tracking-wider">{leader.role}</div>
+        </div>
+        <div className="col-span-4 flex justify-end items-center gap-2 font-mono text-xl font-bold text-amber-600 dark:text-amber-400">
+          <Flame size={18} className="text-orange-500" />
+          {leader.xp || 0}
         </div>
       </div>
-      <div className="col-span-4 flex justify-end items-center gap-2 font-mono text-xl font-bold text-amber-600 dark:text-amber-400">
-        <Flame size={18} className="text-orange-500" />
-        {leader.xp || 0}
-      </div>
-    </div>
+    </Link>
   );
 });
 
 export default function Leaderboard({ user }: { user: any }) {
+
   const [leaders, setLeaders] = useState<any[]>([]);
+  const [contributors, setContributors] = useState<any[]>([]);
 
   useEffect(() => {
     if (!user) return;
@@ -51,7 +56,40 @@ export default function Leaderboard({ user }: { user: any }) {
         handleFirestoreError(error, OperationType.GET, "users");
       }
     };
+    
+    const fetchContributors = async () => {
+      try {
+        const q = query(collection(db, "resources"), orderBy("timestamp", "desc"), limit(1000));
+        const snap = await getDocs(q);
+        
+        const userCounts: Record<string, { count: number; name: string; uid: string }> = {};
+        snap.forEach(document => {
+          const data = document.data();
+          if (data.userId) {
+            if (!userCounts[data.userId]) {
+              userCounts[data.userId] = { count: 0, name: data.uploadedBy || "Anonymous", uid: data.userId };
+            }
+            userCounts[data.userId].count++;
+          }
+        });
+        
+        const ranked = Object.values(userCounts)
+          .sort((a, b) => b.count - a.count)
+          .slice(0, 4);
+          
+        const contributorData = await Promise.all(ranked.map(async (r) => {
+          const uSnap = await getDoc(doc(db, "users", r.uid));
+          const uData = uSnap.exists() ? uSnap.data() : { photoURL: `https://api.dicebear.com/7.x/avataaars/svg?seed=${r.uid}`, displayName: r.name };
+          return { ...uData, id: r.uid, contributionCount: r.count };
+        }));
+        setContributors(contributorData);
+      } catch (error) {
+        console.error("Error fetching contributors:", error);
+      }
+    };
+
     fetchLeaders();
+    fetchContributors();
   }, [user]);
 
   if (!user) {
@@ -106,24 +144,29 @@ export default function Leaderboard({ user }: { user: any }) {
         </div>
       </div>
       
-      {/* Top Contributors this Week */}
-      <div className="glass-panel p-6 rounded-3xl">
-        <h2 className="text-xl font-bold mb-4 flex items-center gap-2">
-           <Award className="text-cyan-500" /> Top Contributors this Week
-        </h2>
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            {leaders.slice(0, 4).map((leader, index) => (
-                <div key={leader.id} className="flex flex-col items-center gap-2 p-4 bg-black/5 dark:bg-white/5 rounded-2xl border border-[var(--border)]">
-                    <img src={leader.photoURL} alt={leader.displayName} className="w-16 h-16 rounded-full" />
-                    <div className="text-center">
-                        <p className="font-bold text-sm truncate">{leader.displayName}</p>
-                        {index === 0 && <span className="text-[10px] bg-cyan-500/20 text-cyan-600 px-2 py-0.5 rounded-full font-bold">Nexus Legend 🌟</span>}
-                        {index > 0 && <span className="text-[10px] text-[var(--foreground)]/50">Contributor</span>}
-                    </div>
-                </div>
-            ))}
+      {/* Top Contributors */}
+      {contributors.length > 0 && (
+        <div className="glass-panel p-6 rounded-3xl">
+          <h2 className="text-xl font-bold mb-4 flex items-center gap-2">
+             <Award className="text-cyan-500" /> Top Contributors this Week
+          </h2>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              {contributors.map((contributor, index) => (
+                  <Link to={`/profile/${contributor.id}`} key={contributor.id} className="flex flex-col items-center gap-2 p-4 bg-black/5 dark:bg-white/5 rounded-2xl border border-[var(--border)] hover:bg-black/10 dark:hover:bg-white/10 transition-colors cursor-pointer group">
+                      <img src={contributor.photoURL} alt={contributor.displayName} className="w-16 h-16 rounded-full group-hover:ring-2 group-hover:ring-blue-500 transition-all" />
+                      <div className="text-center">
+                          <p className="font-bold text-sm truncate max-w-[120px] group-hover:text-blue-500 transition-colors">{contributor.displayName}</p>
+                          {index === 0 ? (
+                            <span className="text-[10px] bg-cyan-500/20 text-cyan-600 px-2 py-0.5 rounded-full font-bold">Nexus Legend ({contributor.contributionCount}) 🌟</span>
+                          ) : (
+                            <span className="text-[10px] text-[var(--foreground)]/50">{contributor.contributionCount} Uploads</span>
+                          )}
+                      </div>
+                  </Link>
+              ))}
+          </div>
         </div>
-      </div>
+      )}
     </div>
   );
 }

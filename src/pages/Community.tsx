@@ -5,6 +5,7 @@ import { db } from "../firebase";
 import { Send, User, Star, Quote, Users } from "lucide-react";
 import { toast } from "../components/Toast";
 import { handleFirestoreError, OperationType } from "../utils/errorHandling";
+import { Link } from "react-router-dom";
 
 interface Review {
   id: string;
@@ -142,21 +143,21 @@ export default function Community({ user }: { user: any }) {
             reviews.map((review) => (
               <div key={review.id} className="bg-black/5 dark:bg-white/5 p-6 rounded-2xl space-y-3">
                 <div className="flex justify-between items-start">
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-full bg-blue-500/20 flex items-center justify-center text-blue-600 dark:text-blue-400 font-bold overflow-hidden">
+                  <Link to={`/profile/${review.userId}`} className="flex items-center gap-3 group cursor-pointer">
+                    <div className="w-10 h-10 rounded-full bg-blue-500/20 flex items-center justify-center text-blue-600 dark:text-blue-400 font-bold overflow-hidden group-hover:ring-2 group-hover:ring-blue-500 transition-all">
                       {review.userPhoto ? (
                         <img src={review.userPhoto} alt={review.userName} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
                       ) : (
-                        <User size={20} />
+                        <User size={20} className="group-hover:text-blue-500 transition-colors" />
                       )}
                     </div>
                     <div>
-                      <p className="font-bold">{review.userName}</p>
+                      <p className="font-bold group-hover:text-blue-500 transition-colors">{review.userName}</p>
                       <p className="text-xs text-[var(--foreground)]/50">
                         {review.timestamp?.toDate().toLocaleDateString() || "Just now"}
                       </p>
                     </div>
-                  </div>
+                  </Link>
                   <div className="flex gap-1">
                     {[...Array(5)].map((_, i) => (
                       <Star key={i} size={16} className={i < review.rating ? "text-amber-500" : "text-gray-300 dark:text-gray-700"} fill={i < review.rating ? "currentColor" : "none"} />

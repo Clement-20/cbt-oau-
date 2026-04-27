@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useMemo } from "react";
-import { useLocation } from "react-router-dom";
+import { useLocation, Link } from "react-router-dom";
 import { Upload, FileText, Download, Search, Trash2, X, Loader2, ThumbsUp, ThumbsDown, UserPlus, UserMinus, Filter, ChevronDown, BookOpen, Clock, Star, ExternalLink, Image as ImageIcon, File as FileIcon, User, Share2, Flag, AlertTriangle, CheckCircle2 } from "lucide-react";
 import { collection, onSnapshot, query, orderBy, addDoc, serverTimestamp, deleteDoc, doc, getDocs, where, updateDoc, increment, limit, startAfter, getDoc, QueryDocumentSnapshot } from "firebase/firestore";
 import { db, auth } from "../firebase";
@@ -348,7 +348,12 @@ export default function ResourceMarketplace({ user, isAdmin }: { user?: any, isA
       
       // Close modal before fetching to provide immediate feedback
       setShowUpload(false);
-      toast("Success! Resource published to the vault! 🚀");
+      
+      if (isVerifiedUser) {
+        toast("Success! Resource published to the vault! 🚀");
+      } else {
+        toast("Upload successful! Pending approval by the Overlord. 🛡️");
+      }
       
       fetchResources(true);
     } catch (error) {
@@ -687,18 +692,18 @@ export default function ResourceMarketplace({ user, isAdmin }: { user?: any, isA
                   </h3>
 
                   <div className="flex items-center justify-between mb-6">
-                    <div className="flex items-center gap-2">
-                      <div className="w-8 h-8 rounded-full bg-black/5 dark:bg-white/10 flex items-center justify-center">
-                        <User size={16} className="text-[var(--foreground)]/40" />
+                    <Link to={`/profile/${resource.userId}`} className="flex items-center gap-2 group/author cursor-pointer">
+                      <div className="w-8 h-8 rounded-full bg-black/5 dark:bg-white/10 flex items-center justify-center group-hover/author:ring-2 group-hover/author:ring-cyan-500 transition-all overflow-hidden relative">
+                        <User size={16} className="text-[var(--foreground)]/40 group-hover/author:text-cyan-500 transition-colors" />
                       </div>
                       <div>
                         <p className="text-[10px] font-bold text-[var(--foreground)]/40 uppercase tracking-widest">Uploaded by</p>
-                        <div className="flex items-center gap-1">
+                        <div className="flex items-center gap-1 group-hover/author:text-cyan-500 transition-colors">
                           <p className="text-xs font-bold">By {resource.uploadedBy}</p>
                           {resource.uploaderVerified && <Star size={10} className="text-blue-500 fill-blue-500" />}
                         </div>
                       </div>
-                    </div>
+                    </Link>
                     {resource.userId !== user?.uid && (
                       <button 
                         onClick={() => followedUploaders.includes(resource.userId) ? unfollowUploader(resource.userId) : followUploader(resource.userId)}
