@@ -41,6 +41,8 @@ import LoadingLogo from "./components/LoadingLogo";
 import Tutorial from "./components/Tutorial";
 import ShareModal from "./components/ShareModal";
 import OfflineBanner from "./components/OfflineBanner";
+import InstallPwaBanner from "./components/InstallPwaBanner";
+import SignInPromptBanner from "./components/SignInPromptBanner";
 import { useNotifications } from "./lib/notifications";
 
 import BottomNav from "./nexus-features/BottomNav";
@@ -561,6 +563,8 @@ function MainApp() {
       <BottomNav />
       <CommandPalette />
       <OfflineBanner />
+      <InstallPwaBanner />
+      <SignInPromptBanner user={user} login={login} />
       <Toast />
     </div>
   );

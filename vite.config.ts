@@ -12,7 +12,7 @@ export default defineConfig(({mode}) => {
       tailwindcss(),
       VitePWA({
         registerType: 'autoUpdate',
-        includeAssets: ['favicon.ico', 'apple-touch-icon.png', 'masked-icon.svg'],
+        includeAssets: ['favicon.ico', 'logo.svg'],
         manifest: {
           name: 'Digital Nexus',
           short_name: 'Nexus',
@@ -23,14 +23,20 @@ export default defineConfig(({mode}) => {
           orientation: 'portrait',
           icons: [
             {
-              src: 'pwa-192x192.png',
+              src: '/logo.svg',
               sizes: '192x192',
-              type: 'image/png'
+              type: 'image/svg+xml'
             },
             {
-              src: 'pwa-512x512.png',
+              src: '/logo.svg',
               sizes: '512x512',
-              type: 'image/png'
+              type: 'image/svg+xml'
+            },
+            {
+              src: '/logo.svg',
+              sizes: 'any',
+              type: 'image/svg+xml',
+              purpose: 'any maskable'
             }
           ]
         },
