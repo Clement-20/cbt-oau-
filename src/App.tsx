@@ -4,7 +4,7 @@ import { ThemeProvider, useTheme } from "./components/theme-provider";
 import { getSettings, subscribeToSettings } from "./lib/settings";
 import { Helmet } from "./components/Helmet";
 import { useEffect, useState, Suspense, lazy } from "react";
-import { onAuthStateChanged, signInWithPopup, GoogleAuthProvider, signOut, browserPopupRedirectResolver, signInAnonymously, signInWithRedirect, getRedirectResult } from "firebase/auth";
+import { onAuthStateChanged, signInWithPopup, GoogleAuthProvider, signOut, signInAnonymously, signInWithRedirect, getRedirectResult } from "firebase/auth";
 import { auth, db } from "./firebase";
 import { doc, getDoc, setDoc, updateDoc, serverTimestamp } from "firebase/firestore";
 import { handleFirestoreError, OperationType } from "./utils/errorHandling";
@@ -252,10 +252,15 @@ function MainApp() {
     try {
       // In iframes, popups often fail due to third-party cookie restrictions.
       // We try popup first, but catch the errors common in these environments.
-      await signInWithPopup(auth, provider, browserPopupRedirectResolver);
+      const signInPromise = signInWithPopup(auth, provider);
+      const timeoutPromise = new Promise((_, reject) =>
+        setTimeout(() => reject(new Error('auth/timeout')), 15000)
+      );
+      
+      await Promise.race([signInPromise, timeoutPromise]);
     } catch (error: any) {
       console.error("Login failed:", error);
-      const errorCode = error.code;
+      const errorCode = error.message === 'auth/timeout' ? 'auth/timeout' : error.code;
       
       // auth/popup-closed-by-user: User manually closed it or browser terminated it
       // auth/cancelled-popup-request: Multiple login attempts
@@ -264,11 +269,14 @@ function MainApp() {
         'auth/popup-closed-by-user',
         'auth/cancelled-popup-request',
         'auth/popup-blocked',
-        'auth/internal-error' // Sometimes happens when popup fails to load resources
+        'auth/internal-error',
+        'auth/timeout'
       ].includes(errorCode);
 
       if (isPopupIssue) {
-        if (isIframe) {
+        if (errorCode === 'auth/timeout') {
+            setLoginError("Login timed out. Authentication popups may be blocked or restricted in this preview window. Please click the 'Open in New Tab' icon at the top right of this panel to log in securely.");
+        } else if (isIframe) {
           setLoginError("Login failed: Authentication popups are restricted in this preview window. Please click the 'Open in New Tab' icon at the top right of this panel to log in securely, or use the link below.");
         } else {
           setLoginError("Login window was closed or blocked. Please ensure popups are allowed for this site and try again.");
