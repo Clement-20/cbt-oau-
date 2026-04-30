@@ -184,7 +184,50 @@ Sitemap: ${BASE_URL}/sitemap.xml`);
     });
   });
 
-  // Vite middleware for development
+      // API Route: AI Tutor Explain
+      app.post("/api/explain", async (req, res) => {
+        const { question, options, correctAnswer } = req.body;
+        if (!question || !options) {
+          return res.status(400).json({ error: "Missing required fields" });
+        }
+
+        try {
+          const { GoogleGenAI } = await import("@google/genai");
+          const rawKey = process.env.GEMINI_API_KEY || "";
+          const apiKey = rawKey.replace(/^["']|["']$/g, "").trim();
+
+          if (!apiKey || apiKey === "MY_GEMINI_API_KEY") {
+            throw new Error("Invalid or missing GEMINI_API_KEY. Please verify your API key in the settings.");
+          }
+          const ai = new GoogleGenAI({ apiKey });
+          
+          let correctAnswerStr = correctAnswer ? `The correct answer is "${correctAnswer}". ` : "";
+          const prompt = `You are an expert tutor for a university CBT (Computer Based Test) platform. 
+${correctAnswerStr}Explain the correct answer for the following question.
+Question: ${question}
+Options: ${options.join(", ")}
+
+Provide a clear, concise, and educational explanation that helps the student learn the underlying concept. Use markdown formatting. Do not output more than 2 paragraphs.`;
+
+          const response = await ai.models.generateContent({
+            model: "gemini-2.5-flash",
+            contents: prompt,
+          });
+          
+          res.json({ explanation: response.text });
+        } catch (error: any) {
+          // Instead of logging the full stack trace, we log a neat explanation
+          const errMsg = error?.message || String(error);
+          if (errMsg.includes("API key not valid") || errMsg.includes("GEMINI_API_KEY")) {
+            console.warn("AI Tutor is currently disabled: Invalid or missing Gemini API key.");
+          } else {
+            console.error("AI Tutor Error:", errMsg);
+          }
+          res.status(500).json({ error: "AI is down" });
+        }
+      });
+
+      // Vite middleware for development
   if (process.env.NODE_ENV !== "production") {
     const vite = await createViteServer({
       server: { middlewareMode: true },

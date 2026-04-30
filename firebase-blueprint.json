@@ -13,7 +13,8 @@
         "gpa": { "type": "number" },
         "aroScore": { "type": "number" },
         "isVerified": { "type": "boolean" },
-        "createdAt": { "type": "string", "format": "date-time" }
+        "createdAt": { "type": "string", "format": "date-time" },
+        "followedUploaders": { "type": "array", "items": { "type": "string" } }
       },
       "required": ["uid", "email", "role", "gpa", "aroScore"]
     },

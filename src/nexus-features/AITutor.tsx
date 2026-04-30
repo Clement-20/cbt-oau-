@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from "react";
+import Markdown from 'react-markdown';
 import { Bot, X, Maximize2, Minimize2, Sparkles, Lock, CreditCard, GripVertical } from "lucide-react";
 import { motion, AnimatePresence, useScroll, useTransform } from "motion/react";
 import { useAcademicStore } from "../lib/academicStore";
@@ -37,18 +38,31 @@ export default function AITutor({ question, options, correctAnswer, isVerified, 
     if (explanation) return;
 
     setIsLoading(true);
-    // Simulate a brief delay for realism even though we are manual now
-    setTimeout(() => {
-      const manualExplanation = `According to the ICEPAB Knowledge Base, the correct answer is indeed **${correctAnswer}**. 
+    
+    try {
+      const response = await fetch("/api/explain", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ question, options, correctAnswer })
+      });
+      
+      if (!response.ok) throw new Error("AI is down");
+      
+      const data = await response.json();
+      setExplanation(data.explanation);
+    } catch (error) {
+      console.warn("AI explain failed, falling back to manual explanation:", error);
+      const manualExplanation = `According to the ICEPAB Knowledge Base, the correct answer is indeed **${correctAnswer || 'one of the options provided'}**. 
 
 Our database confirms this is the verified correct option for this question. Study this topic thoroughly to master similar questions!`;
       
       setExplanation(manualExplanation);
-      if (!isVerified) {
-        incrementAIUsage();
-      }
-      setIsLoading(false);
-    }, 800);
+    }
+    
+    if (!isVerified) {
+      incrementAIUsage();
+    }
+    setIsLoading(false);
   };
 
   // Auto-trigger explanation
@@ -104,7 +118,7 @@ Our database confirms this is the verified correct option for this question. Stu
                   </div>
                 ) : (
                   <div className="text-sm leading-relaxed text-[var(--foreground)]/80 prose dark:prose-invert">
-                    {explanation}
+                    <Markdown>{explanation}</Markdown>
                   </div>
                 )}
               </div>

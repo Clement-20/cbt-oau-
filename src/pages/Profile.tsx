@@ -1,15 +1,18 @@
 import React, { useState, useEffect } from "react";
+import { updateProfile } from "firebase/auth";
 import { doc, getDoc, updateDoc, collection, query, where, getDocs, count } from "firebase/firestore";
 import { handleFirestoreError, OperationType } from "../utils/errorHandling";
-import { db } from "../firebase";
-import { User, BadgeCheck, Upload, CreditCard, CheckCircle2, Loader2, Save, Flame, Clock, Target, Share2, ThumbsUp, Users, Twitter, Linkedin, ExternalLink, Star, FileText, Download } from "lucide-react";
+import { db, auth } from "../firebase";
+import { User, BadgeCheck, Upload, CreditCard, CheckCircle2, Loader2, Save, Flame, Clock, Target, Share2, ThumbsUp, Users, Twitter, Linkedin, ExternalLink, Star, FileText, Download, UserPlus, UserMinus } from "lucide-react";
 import { Helmet } from "react-helmet-async";
 import { toast } from "../components/Toast";
 import { subscribeToSettings } from "../lib/settings";
 import { Link, useParams } from "react-router-dom";
 import { useAcademicStore } from "../lib/academicStore";
+import { syncDisplayNameEverywhere } from "../utils/userProfileSync";
+import { toggleFollowInFirestore } from "../utils/userFollowSync";
 
-export default function Profile({ user }: { user: any }) {
+export default function Profile({ user, dbUser, setDbUser }: { user: any, dbUser?: any, setDbUser?: any }) {
   const { id } = useParams<{ id: string }>();
   const targetId = id || user?.uid;
   const isOwnProfile = !id || id === user?.uid;
@@ -33,9 +36,28 @@ export default function Profile({ user }: { user: any }) {
     following: 0
   });
 
-  const { followedUploaders, favoriteResources } = useAcademicStore();
+  const { followedUploaders, favoriteResources, followUploader, unfollowUploader } = useAcademicStore();
   const [favoriteMaterials, setFavoriteMaterials] = useState<any[]>([]);
   const [loadingFavorites, setLoadingFavorites] = useState(false);
+  const isFollowing = followedUploaders.includes(targetId);
+
+  const handleFollowAction = async () => {
+    if (!user) return toast("Sign in to follow creators");
+    
+    // Optimistic UI update via store
+    if (isFollowing) {
+      unfollowUploader(targetId);
+      setStats(prev => ({...prev, followers: prev.followers - 1}));
+      toast("Unfollowed creator");
+    } else {
+      followUploader(targetId);
+      setStats(prev => ({...prev, followers: prev.followers + 1}));
+      toast("Following creator");
+    }
+    
+    // Sync to Firestore
+    await toggleFollowInFirestore(user.uid, targetId, isFollowing);
+  };
 
   useEffect(() => {
     if (!targetId) {
@@ -127,6 +149,16 @@ export default function Profile({ user }: { user: any }) {
     try {
       const docRef = doc(db, "users", user.uid);
       await updateDoc(docRef, { displayName });
+      if (auth.currentUser) {
+        await updateProfile(auth.currentUser, { displayName });
+      }
+      if (setDbUser && dbUser) {
+        setDbUser({ ...dbUser, displayName });
+      }
+      
+      // Update the user's name everywhere they have posted
+      syncDisplayNameEverywhere(user.uid, displayName);
+      
       toast("Profile updated successfully!");
     } catch (error) {
       handleFirestoreError(error, OperationType.UPDATE, `users/${user.uid}`);
@@ -174,21 +206,31 @@ export default function Profile({ user }: { user: any }) {
             </h1>
             {isOwnProfile && <p className="text-[var(--foreground)]/50 font-bold text-sm tracking-tight">{profileEmail}</p>}
           </div>
-          <button 
-            onClick={() => {
-              const text = `Check out ${displayName}'s profile on Digital Nexus! ${isShana ? "Certified Shana! 🔥" : ""} ${isVerified ? "Verified! ✅" : ""}`;
-              window.dispatchEvent(new CustomEvent("open-share-modal", {
-                detail: {
-                  title: `${displayName}'s Profile`,
-                  text: text,
-                  url: window.location.origin + `/profile/${targetId}`
-                }
-              }));
-            }}
-            className="flex items-center justify-center gap-2 bg-white dark:bg-zinc-800 text-[var(--foreground)] border border-[var(--border)] px-5 py-3 rounded-2xl font-bold transition-all shadow-sm mb-2 hover:scale-105 active:scale-95"
-          >
-            <Share2 size={18} /> Share
-          </button>
+          <div className="flex gap-2 mb-2">
+            {!isOwnProfile && (
+              <button 
+                onClick={handleFollowAction}
+                className={`flex items-center justify-center gap-2 px-5 py-3 rounded-2xl font-bold transition-all shadow-sm hover:scale-105 active:scale-95 ${isFollowing ? 'bg-black/5 dark:bg-white/5 border border-[var(--border)] text-[var(--foreground)]' : 'bg-cyan-500 text-white border border-cyan-400 dark:border-cyan-600'}`}
+              >
+                {isFollowing ? <><UserMinus size={18} /> Unfollow</> : <><UserPlus size={18} /> Follow</>}
+              </button>
+            )}
+            <button 
+              onClick={() => {
+                const text = `Check out ${displayName}'s profile on Digital Nexus! ${isShana ? "Certified Shana! 🔥" : ""} ${isVerified ? "Verified! ✅" : ""}`;
+                window.dispatchEvent(new CustomEvent("open-share-modal", {
+                  detail: {
+                    title: `${displayName}'s Profile`,
+                    text: text,
+                    url: window.location.origin + `/profile/${targetId}`
+                  }
+                }));
+              }}
+              className="flex items-center justify-center gap-2 bg-white dark:bg-zinc-800 text-[var(--foreground)] border border-[var(--border)] px-5 py-3 rounded-2xl font-bold transition-all shadow-sm hover:scale-105 active:scale-95"
+            >
+              <Share2 size={18} /> Share
+            </button>
+          </div>
         </div>
       </div>
 

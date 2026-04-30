@@ -50,7 +50,7 @@ service cloud.firestore {
                       incoming().createdAt == request.time;
       allow update: if (isOwner(userId) || isAdmin()) && (
         // Action: Standard Update
-        (incoming().diff(existing()).affectedKeys().hasOnly(['displayName', 'photoURL', 'matricNumber', 'faculty', 'department', 'level', 'xp', 'currentStreak', 'lastActiveDate', 'dailyTokenCount', 'lastTokenReset', 'email', 'isShana', 'cbtTimeSpent', 'highScoreCount', 'shanaPeriodStart', 'isGuest', 'uid'])) ||
+        (incoming().diff(existing()).affectedKeys().hasOnly(['displayName', 'photoURL', 'matricNumber', 'faculty', 'department', 'level', 'xp', 'currentStreak', 'lastActiveDate', 'dailyTokenCount', 'lastTokenReset', 'email', 'isShana', 'cbtTimeSpent', 'highScoreCount', 'shanaPeriodStart', 'isGuest', 'uid', 'followedUploaders'])) ||
         // Action: Admin Override
         isAdmin()
       );
@@ -68,7 +68,8 @@ service cloud.firestore {
       allow create: if isSignedIn() && isValidId(resourceId) && isValidResource(incoming()) && (isVerified() || isAdmin());
       
       // Restrict all updates and deletes to Admin as strictly requested
-      allow update, delete: if isAdmin() && isValidId(resourceId);
+      allow update: if (isAdmin() && isValidId(resourceId)) || (isOwner(existing().userId) && incoming().diff(existing()).affectedKeys().hasOnly(['uploadedBy']));
+      allow delete: if isAdmin() && isValidId(resourceId);
     }
     
     // 2.1 Reports Collection
@@ -85,13 +86,15 @@ service cloud.firestore {
       allow read: if isAdmin();
       allow create: if isSignedIn() && isValidReport(incoming()) && 
                       exists(/databases/$(database)/documents/resources/$(incoming().resourceId));
-      allow update, delete: if isAdmin();
+      allow update: if isAdmin() || (isOwner(existing().reportedBy) && incoming().diff(existing()).affectedKeys().hasOnly(['reporterName']));
+      allow delete: if isAdmin();
     }
 
     // 3. Community Reviews
     match /community_reviews/{reviewId} {
       allow read: if isAdmin() || resource.data.get('text', null) != null;
       allow create: if isSignedIn() && incoming().userId == request.auth.uid && incoming().text.size() <= 1000;
+      allow update: if isOwner(existing().userId) && incoming().diff(existing()).affectedKeys().hasOnly(['userName']);
       allow delete: if isAdmin();
     }
 
@@ -104,7 +107,8 @@ service cloud.firestore {
     match /pending_questions/{id} {
       allow read: if isSignedIn() && (resource.data.status == "pending" || isAdmin());
       allow create: if isSignedIn();
-      allow update, delete: if isAdmin();
+      allow update: if isAdmin() || (isOwner(existing().authorId) && incoming().diff(existing()).affectedKeys().hasOnly(['authorName']));
+      allow delete: if isAdmin();
     }
 
     match /hosted_tests/{id} {
@@ -116,6 +120,7 @@ service cloud.firestore {
     match /test_results/{id} {
       allow read: if isSignedIn() && (resource.data.userId == request.auth.uid || isAdmin());
       allow create: if isSignedIn();
+      allow update: if isOwner(existing().userId) && incoming().diff(existing()).affectedKeys().hasOnly(['userName']);
     }
 
     // 5. User CGPA Data

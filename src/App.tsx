@@ -13,6 +13,7 @@ import { clsx } from "clsx";
 import NexusBadge from "./components/NexusBadge";
 import Toast from "./components/Toast";
 import { updateNexusStreak } from "./utils/nexusUtils";
+import { useAcademicStore } from "./lib/academicStore";
 import StudyDeck from "./components/StudyDeck";
 
 // Lazy load pages for code splitting (low bandwidth optimization)
@@ -37,6 +38,7 @@ const PostUTME = lazy(() => import("./pages/PostUTME"));
 const Reviews = lazy(() => import("./pages/Reviews"));
 
 import { ErrorBoundary } from "./components/ErrorBoundary";
+import ConfirmModal from "./components/ConfirmModal";
 import LoadingLogo from "./components/LoadingLogo";
 import Tutorial from "./components/Tutorial";
 import ShareModal from "./components/ShareModal";
@@ -66,6 +68,7 @@ function MainApp() {
   const [isFocusMode, setIsFocusMode] = useState(false);
   const [studyDeckContext, setStudyDeckContext] = useState<string | undefined>();
   const [studyDeckPrompt, setStudyDeckPrompt] = useState<string | undefined>();
+  const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
   const { theme, setTheme } = useTheme();
   const location = useLocation();
   const navigate = useNavigate();
@@ -208,6 +211,11 @@ function MainApp() {
             }
             
             setDbUser(userData);
+            
+            // Hydrate local store with firestore followers to ensure honesty
+            if (userData.followedUploaders) {
+              useAcademicStore.setState({ followedUploaders: userData.followedUploaders });
+            }
             
             // Update streak asynchronously without blocking the UI
             updateNexusStreak(currentUser.uid).then(newStreak => {
@@ -408,7 +416,7 @@ function MainApp() {
                     <NexusBadge isVerified={dbUser?.isVerified} badgeType={dbUser?.badgeType} isShana={dbUser?.isShana} badges={dbUser?.badges} />
                   </span>
                 </Link>
-                <button onClick={logout} className="p-2 rounded-full hover:bg-black/5 dark:hover:bg-white/10 transition-colors text-red-500" aria-label="Log out">
+                <button onClick={() => setShowLogoutConfirm(true)} className="p-2 rounded-full hover:bg-black/5 dark:hover:bg-white/10 transition-colors text-red-500" aria-label="Log out">
                   <LogOut size={18} />
                 </button>
               </div>
@@ -514,8 +522,8 @@ function MainApp() {
             <Route path="/reviews" element={<Reviews />} />
             <Route path="/gpa" element={<GPA user={user} />} />
             <Route path="/aro" element={<Aro user={user} />} />
-            <Route path="/profile" element={<Profile user={user} />} />
-            <Route path="/profile/:id" element={<Profile user={user} />} />
+            <Route path="/profile" element={<Profile user={user} dbUser={dbUser} setDbUser={setDbUser} />} />
+            <Route path="/profile/:id" element={<Profile user={user} dbUser={dbUser} setDbUser={setDbUser} />} />
             <Route path="/setup" element={<Setup user={user} dbUser={dbUser} setDbUser={setDbUser} />} />
             <Route path="/about" element={<About />} />
             <Route path="/community" element={<Community user={user} />} />
@@ -566,6 +574,17 @@ function MainApp() {
       <InstallPwaBanner />
       <SignInPromptBanner user={user} login={login} />
       <Toast />
+      
+      <ConfirmModal 
+        isOpen={showLogoutConfirm}
+        title="Sign Out"
+        message="Are you sure you want to sign out of Digital Nexus?"
+        onConfirm={() => {
+          setShowLogoutConfirm(false);
+          logout();
+        }}
+        onCancel={() => setShowLogoutConfirm(false)}
+      />
     </div>
   );
 }

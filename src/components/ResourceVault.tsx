@@ -7,6 +7,7 @@ import { toast } from "./Toast";
 import ConfirmModal from "./ConfirmModal";
 import { handleFirestoreError, OperationType } from "../utils/errorHandling";
 import { useAcademicStore } from "../lib/academicStore";
+import { toggleFollowInFirestore } from "../utils/userFollowSync";
 import { motion, AnimatePresence } from "motion/react";
 import { subscribeToSettings } from "../lib/settings";
 
@@ -64,6 +65,8 @@ export default function ResourceMarketplace({ user, isAdmin }: { user?: any, isA
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [isUploading, setIsUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
+  const [uploadStatus, setUploadStatus] = useState<"idle" | "uploading" | "finalizing" | "success" | "error">("idle");
+  const [uploadErrorMsg, setUploadErrorMsg] = useState("");
   const [isLoading, setIsLoading] = useState(true);
   const [lastDoc, setLastDoc] = useState<QueryDocumentSnapshot | null>(null);
   const [hasMore, setHasMore] = useState(true);
@@ -282,6 +285,8 @@ export default function ResourceMarketplace({ user, isAdmin }: { user?: any, isA
       }
 
       setIsUploading(true);
+      setUploadStatus("uploading");
+      setUploadErrorMsg("");
       setUploadProgress(0);
       
       try {
@@ -322,7 +327,7 @@ export default function ResourceMarketplace({ user, isAdmin }: { user?: any, isA
         xhr.onload = () => {
           if (xhr.status >= 200 && xhr.status < 300) {
             const response = JSON.parse(xhr.responseText);
-            toast("File uploaded to Cloud successfully! ☁️");
+            // toast("File uploaded to Cloud successfully! ☁️");
             resolve(response.secure_url);
           } else {
             console.error("[Cloudinary] Upload Error:", xhr.responseText);
@@ -334,6 +339,8 @@ export default function ResourceMarketplace({ user, isAdmin }: { user?: any, isA
         xhr.send(formData);
       });
       
+      setUploadStatus("finalizing");
+
       await addDoc(collection(db, "resources"), {
         title: newResource.title,
         type: newResource.type,
@@ -354,11 +361,9 @@ export default function ResourceMarketplace({ user, isAdmin }: { user?: any, isA
         timestamp: serverTimestamp()
       });
       
+      setUploadStatus("success");
       setNewResource({ title: "", type: "PDF", url: "", course: "", category: "Notes", department: "", level: "100" });
       setSelectedFile(null);
-      
-      // Close modal before fetching to provide immediate feedback
-      setShowUpload(false);
       
       if (isVerifiedUser) {
         toast("Success! Resource published to the vault! 🚀");
@@ -367,10 +372,20 @@ export default function ResourceMarketplace({ user, isAdmin }: { user?: any, isA
       }
       
       fetchResources(true);
+      
+      setTimeout(() => {
+        setShowUpload(false);
+        setUploadStatus("idle");
+        setIsUploading(false);
+        isSubmittingRef.current = false;
+      }, 2000);
+
     } catch (error) {
+      console.error(error);
       handleFirestoreError(error, OperationType.CREATE, "resources");
+      setUploadStatus("error");
+      setUploadErrorMsg("Upload failed. Please try again.");
       toast("Upload failed. Security rules might have blocked the request.");
-    } finally {
       setIsUploading(false);
       isSubmittingRef.current = false;
     }
@@ -459,6 +474,23 @@ export default function ResourceMarketplace({ user, isAdmin }: { user?: any, isA
       window.open(resource.url, "_blank", "noopener,noreferrer");
       toast("Error downloading. Opened in tab instead. 🌐");
     }
+  };
+
+  const handleFollowAction = async (targetUserId: string) => {
+    if (!user) return toast("Sign in to follow creators");
+    const isFollowing = followedUploaders.includes(targetUserId);
+    
+    // Optimistic UI update via store
+    if (isFollowing) {
+      unfollowUploader(targetUserId);
+      toast("Unfollowed creator");
+    } else {
+      followUploader(targetUserId);
+      toast("Following creator");
+    }
+    
+    // Sync to Firestore
+    await toggleFollowInFirestore(user.uid, targetUserId, isFollowing);
   };
 
   const handleSocialAction = async (resource: Resource, action: "like" | "dislike") => {
@@ -718,7 +750,7 @@ export default function ResourceMarketplace({ user, isAdmin }: { user?: any, isA
                     </Link>
                     {resource.userId !== user?.uid && (
                       <button 
-                        onClick={() => followedUploaders.includes(resource.userId) ? unfollowUploader(resource.userId) : followUploader(resource.userId)}
+                        onClick={() => handleFollowAction(resource.userId)}
                         className={`p-2 rounded-xl transition-all ${followedUploaders.includes(resource.userId) ? 'bg-cyan-500 text-white' : 'bg-black/5 dark:bg-white/5 text-cyan-600 hover:bg-cyan-500/10'}`}
                       >
                         {followedUploaders.includes(resource.userId) ? <UserMinus size={16} /> : <UserPlus size={16} />}
@@ -863,7 +895,7 @@ export default function ResourceMarketplace({ user, isAdmin }: { user?: any, isA
                     onChange={(e) => setNewResource({...newResource, title: e.target.value})}
                     className="w-full bg-black/5 dark:bg-white/5 border border-[var(--border)] rounded-2xl p-4 text-sm font-bold focus:outline-none focus:border-cyan-500 transition-all"
                     required
-                    disabled={isUploading}
+                    disabled={uploadStatus !== "idle" && uploadStatus !== "error"}
                   />
                 </div>
 
@@ -876,7 +908,7 @@ export default function ResourceMarketplace({ user, isAdmin }: { user?: any, isA
                     onChange={(e) => setNewResource({...newResource, department: e.target.value})}
                     className="w-full bg-black/5 dark:bg-white/5 border border-[var(--border)] rounded-2xl p-4 text-sm font-bold focus:outline-none focus:border-cyan-500 transition-all"
                     required
-                    disabled={isUploading}
+                    disabled={uploadStatus !== "idle" && uploadStatus !== "error"}
                   />
                 </div>
 
@@ -886,7 +918,7 @@ export default function ResourceMarketplace({ user, isAdmin }: { user?: any, isA
                     value={newResource.level}
                     onChange={(e) => setNewResource({...newResource, level: e.target.value})}
                     className="w-full bg-black/5 dark:bg-white/5 border border-[var(--border)] rounded-2xl p-4 text-sm font-bold focus:outline-none focus:border-cyan-500 transition-all"
-                    disabled={isUploading}
+                    disabled={uploadStatus !== "idle" && uploadStatus !== "error"}
                   >
                     {[100, 200, 300, 400, 500, 600, "Post-Grad"].map(lvl => (
                       <option key={lvl.toString()} value={lvl.toString()}>{lvl} Level</option>
@@ -903,7 +935,7 @@ export default function ResourceMarketplace({ user, isAdmin }: { user?: any, isA
                     onChange={(e) => setNewResource({...newResource, course: e.target.value.toUpperCase()})}
                     className="w-full bg-black/5 dark:bg-white/5 border border-[var(--border)] rounded-2xl p-4 text-sm font-bold focus:outline-none focus:border-cyan-500 transition-all"
                     required
-                    disabled={isUploading}
+                    disabled={uploadStatus !== "idle" && uploadStatus !== "error"}
                   />
                 </div>
                 
@@ -913,7 +945,7 @@ export default function ResourceMarketplace({ user, isAdmin }: { user?: any, isA
                     value={newResource.category}
                     onChange={(e) => setNewResource({...newResource, category: e.target.value})}
                     className="w-full bg-black/5 dark:bg-white/5 border border-[var(--border)] rounded-2xl p-4 text-sm font-bold focus:outline-none focus:border-cyan-500 transition-all"
-                    disabled={isUploading}
+                    disabled={uploadStatus !== "idle" && uploadStatus !== "error"}
                   >
                     {["Notes", "Past Questions", "Textbooks", "Assignments"].map(cat => (
                       <option key={cat} value={cat}>{cat}</option>
@@ -924,8 +956,8 @@ export default function ResourceMarketplace({ user, isAdmin }: { user?: any, isA
                 <div className="space-y-1">
                   <label className="text-[10px] font-black text-[var(--foreground)]/40 uppercase tracking-widest ml-2">Select PDF File</label>
                   <div 
-                    onClick={() => !isUploading && fileInputRef.current?.click()}
-                    className="w-full border-2 border-dashed border-[var(--border)] rounded-2xl p-8 flex flex-col items-center justify-center cursor-pointer hover:bg-cyan-500/5 hover:border-cyan-500/30 transition-all group"
+                    onClick={() => (uploadStatus === "idle" || uploadStatus === "error") && fileInputRef.current?.click()}
+                    className={`w-full border-2 border-dashed border-[var(--border)] rounded-2xl p-8 flex flex-col items-center justify-center cursor-pointer hover:bg-cyan-500/5 hover:border-cyan-500/30 transition-all group ${(uploadStatus !== "idle" && uploadStatus !== "error") ? 'opacity-50 pointer-events-none' : ''}`}
                   >
                     <input 
                       type="file" 
@@ -974,10 +1006,10 @@ export default function ResourceMarketplace({ user, isAdmin }: { user?: any, isA
 
                 <button 
                   type="submit" 
-                  disabled={isUploading}
-                  className="w-full bg-cyan-600 hover:bg-cyan-700 disabled:bg-cyan-800 disabled:cursor-not-allowed text-white py-5 rounded-2xl font-black uppercase tracking-widest transition-all flex flex-col items-center justify-center shadow-xl shadow-cyan-500/20"
+                  disabled={uploadStatus !== "idle" && uploadStatus !== "error"}
+                  className={`w-full py-5 rounded-2xl font-black uppercase tracking-widest transition-all flex flex-col items-center justify-center shadow-xl shadow-cyan-500/20 ${uploadStatus === "success" ? "bg-emerald-500 hover:bg-emerald-600 text-white" : uploadStatus === "error" ? "bg-red-500 hover:bg-red-600 text-white" : "bg-cyan-600 hover:bg-cyan-700 disabled:bg-cyan-800 disabled:cursor-not-allowed text-white"}`}
                 >
-                  {isUploading ? (
+                  {uploadStatus === "uploading" ? (
                     <div className="w-full px-6 flex flex-col items-center">
                       <div className="flex items-center gap-2 mb-3">
                         <Loader2 className="animate-spin" size={20} /> 
@@ -989,6 +1021,21 @@ export default function ResourceMarketplace({ user, isAdmin }: { user?: any, isA
                           style={{ width: `${uploadProgress}%` }}
                         />
                       </div>
+                    </div>
+                  ) : uploadStatus === "finalizing" ? (
+                    <div className="flex items-center gap-2">
+                       <Loader2 className="animate-spin" size={20} /> 
+                       <span>Finalizing...</span>
+                    </div>
+                  ) : uploadStatus === "success" ? (
+                    <div className="flex items-center gap-2">
+                      <CheckCircle2 size={24} />
+                      <span>Upload Complete!</span>
+                    </div>
+                  ) : uploadStatus === "error" ? (
+                    <div className="flex items-center gap-2 text-white">
+                      <AlertTriangle size={24} />
+                      <span>{uploadErrorMsg || "Upload Failed - Try Again"}</span>
                     </div>
                   ) : "Publish to Marketplace"}
                 </button>
