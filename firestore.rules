@@ -132,6 +132,8 @@ service cloud.firestore {
     match /notifications/{id} {
       allow read: if isSignedIn() && (resource.data.userId == request.auth.uid || isAdmin());
       allow create: if isSignedIn();
+      allow update: if isOwner(existing().userId) && incoming().diff(existing()).affectedKeys().hasOnly(['read']);
+      allow delete: if isOwner(existing().userId) || isAdmin();
     }
 
     match /security_alerts/{id} {

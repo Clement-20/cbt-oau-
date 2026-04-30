@@ -8,6 +8,7 @@ import ConfirmModal from "./ConfirmModal";
 import { handleFirestoreError, OperationType } from "../utils/errorHandling";
 import { useAcademicStore } from "../lib/academicStore";
 import { toggleFollowInFirestore } from "../utils/userFollowSync";
+import { notifyFollowers } from "../lib/notifications";
 import { motion, AnimatePresence } from "motion/react";
 import { subscribeToSettings } from "../lib/settings";
 
@@ -361,6 +362,14 @@ export default function ResourceMarketplace({ user, isAdmin }: { user?: any, isA
         timestamp: serverTimestamp()
       });
       
+      notifyFollowers(
+        user.uid,
+        user.displayName || "Anonymous",
+        "New Material Uploaded! 📚",
+        `${user.displayName || "Someone"} just uploaded "${newResource.title}". Check it out!`,
+        "upload"
+      );
+
       setUploadStatus("success");
       setNewResource({ title: "", type: "PDF", url: "", course: "", category: "Notes", department: "", level: "100" });
       setSelectedFile(null);

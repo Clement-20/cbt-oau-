@@ -180,12 +180,31 @@
         "status": { "type": "string", "enum": ["pending", "resolved"] }
       },
       "required": ["resourceId", "reason", "reportedBy", "timestamp", "status"]
+    },
+    "Notification": {
+      "title": "Notification",
+      "description": "An in-app notification for a user",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "title": { "type": "string" },
+        "message": { "type": "string" },
+        "type": { "type": "string", "enum": ["system", "follow", "upload", "validation", "admin"] },
+        "read": { "type": "boolean" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "actionUrl": { "type": "string" }
+      },
+      "required": ["userId", "title", "message", "type", "read", "createdAt"]
     }
   },
   "firestore": {
     "/users/{userId}": {
       "schema": { "$ref": "#/entities/User" },
       "description": "Stores user profiles"
+    },
+    "/notifications/{notificationId}": {
+      "schema": { "$ref": "#/entities/Notification" },
+      "description": "Stores in-app notifications for the user"
     },
     "/broadcasts/{broadcastId}": {
       "schema": { "$ref": "#/entities/Broadcast" },

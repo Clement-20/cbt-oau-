@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { collection, addDoc, serverTimestamp, query, where, getDocs, updateDoc, doc, increment, deleteDoc, orderBy, limit, writeBatch } from "firebase/firestore";
+import { collection, addDoc, serverTimestamp, query, where, getDocs, updateDoc, doc, increment, deleteDoc, orderBy, limit, writeBatch, getDoc } from "firebase/firestore";
 import { handleFirestoreError, OperationType } from "../utils/errorHandling";
 import { db } from "../firebase";
 import { ShieldAlert, Send, Search, BadgeCheck, Loader2, CheckCircle, Trash2, FileText, BookOpen, ShieldCheck, Ban, UserMinus, UserPlus } from "lucide-react";
@@ -8,6 +8,7 @@ import { Helmet } from "react-helmet-async";
 import { toast } from "../components/Toast";
 import ConfirmModal from "../components/ConfirmModal";
 import { getSettings, updateSettings, subscribeToSettings } from "../lib/settings";
+import { triggerNotification } from "../lib/notifications";
 
 export default function Admin({ user }: { user: any }) {
   const [message, setMessage] = useState("");
@@ -76,6 +77,8 @@ export default function Admin({ user }: { user: any }) {
       });
       setUnverifiedUsers(prev => prev.filter(u => u.id !== userId));
       toast("User verified successfully!");
+      
+      triggerNotification(userId, "Verification Approved", "Congratulations! You are Now Verified! ✅", "system");
     } catch (error) {
       handleFirestoreError(error, OperationType.UPDATE, `users/${userId}`);
       toast("Failed to verify user.");
@@ -91,6 +94,8 @@ export default function Admin({ user }: { user: any }) {
       
       setPaymentVerifications(prev => prev.filter(p => p.id !== paymentId));
       toast("Payment verified and user updated!");
+      
+      triggerNotification(userId, "Payment Approved", "Your payment was approved! You are Now Verified! ✅", "system");
     } catch (error) {
       handleFirestoreError(error, OperationType.UPDATE, `payment_verifications/${paymentId}`);
       toast("Failed to verify payment.");
@@ -100,9 +105,17 @@ export default function Admin({ user }: { user: any }) {
   const approveResource = async (resourceId: string) => {
     try {
       const resourceRef = doc(db, "resources", resourceId);
+      const resDoc = await getDoc(resourceRef);
       await updateDoc(resourceRef, { validated: true });
       setPendingResources(prev => prev.filter(r => r.id !== resourceId));
       toast("Resource approved and published!");
+      
+      if (resDoc.exists()) {
+        const uId = resDoc.data().userId;
+        if (uId) {
+          triggerNotification(uId, "Resource Validated", `Your uploaded resource "${resDoc.data().title}" has been validated and published! 🚀`, "validation");
+        }
+      }
     } catch (error) {
       handleFirestoreError(error, OperationType.UPDATE, `resources/${resourceId}`);
       toast("Failed to approve resource.");
